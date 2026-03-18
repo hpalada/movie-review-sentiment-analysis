@@ -2,7 +2,7 @@ import json
 import os
 
 
-#  Configuración
+#  Configuración fdfsdfg
 carpeta = "data"
 archivo = f"{carpeta}/peliculas.json"
 
