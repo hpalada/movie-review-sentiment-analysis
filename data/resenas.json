@@ -1,18 +1,6 @@
 {
     "resenas": [
         {
-            "id": 1,
-            "usuario_id": 1,
-            "pelicula_id": 1,
-            "texto": "pelicula basuraaaa",
-            "valoracion_ia": 0.5,
-            "etiquetas_ia": [
-                "neutral"
-            ],
-            "fecha_creacion": "2026-03-19T16:21:50.905256",
-            "fecha_modificacion": null
-        },
-        {
             "id": 2,
             "usuario_id": 1,
             "pelicula_id": 7,
@@ -21,7 +9,19 @@
             "etiquetas_ia": [
                 "neutral"
             ],
-            "fecha_creacion": "2026-03-19T16:21:50.905256",
+            "fecha_creacion": "2026-03-19T15:44:47.920888",
+            "fecha_modificacion": null
+        },
+        {
+            "id": 3,
+            "usuario_id": 1,
+            "pelicula_id": 1,
+            "texto": "Small Town Wisconsin is a success in almost every regard, and if you can see over the legions of cheeseheads in the rows ahead of you, it shouldn’t be missed.",
+            "valoracion_ia": 3.84,
+            "etiquetas_ia": [
+                " Neutral"
+            ],
+            "fecha_creacion": "2026-03-19T16:15:36.181037",
             "fecha_modificacion": null
         }
     ]
