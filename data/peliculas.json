@@ -2,20 +2,12 @@
     "peliculas": [
         {
             "id": 1,
-            "titulo": "Son como Ni\u00f1os",
+            "titulo": "Son como Niños",
             "descripcion": "Pelicula Loca",
             "imagen": "\"C:\\Users\\USUARIO\\Downloads\\MV5BMDJmYWI5NDctZjM5Zi00NzJiLTk4YTEtZjFhYTZhMTJiYWEzXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg\"",
             "fecha": "01/02/2012",
-            "resenas": [
-                {
-                    "usuario": "yo",
-                    "comentario": "pelicula basuraaaa",
-                    "analisis": {
-                        "sentimiento": "neutral",
-                        "score": 0.5
-                    }
-                }
-            ]
+            "anio": null,
+            "director": null
         },
         {
             "id": 2,
@@ -23,7 +15,8 @@
             "descripcion": "robots",
             "imagen": "\"C:\\Users\\USUARIO\\Downloads\\MV5BMDJmYWI5NDctZjM5Zi00NzJiLTk4YTEtZjFhYTZhMTJiYWEzXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg\"",
             "fecha": "02/01/2009",
-            "resenas": []
+            "anio": null,
+            "director": null
         },
         {
             "id": 3,
@@ -31,7 +24,8 @@
             "descripcion": "nose",
             "imagen": "\"C:\\Users\\USUARIO\\Downloads\\MV5BMDJmYWI5NDctZjM5Zi00NzJiLTk4YTEtZjFhYTZhMTJiYWEzXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg\"",
             "fecha": "02/01/2008",
-            "resenas": []
+            "anio": null,
+            "director": null
         },
         {
             "id": 4,
@@ -39,7 +33,8 @@
             "descripcion": "fsdgf",
             "imagen": "fdgsdg",
             "fecha": "32423",
-            "resenas": []
+            "anio": null,
+            "director": null
         },
         {
             "id": 5,
@@ -47,7 +42,8 @@
             "descripcion": "desc",
             "imagen": "img",
             "fecha": "2025",
-            "resenas": []
+            "anio": null,
+            "director": null
         },
         {
             "id": 6,
@@ -55,7 +51,8 @@
             "descripcion": "desc",
             "imagen": "img",
             "fecha": "2025",
-            "resenas": []
+            "anio": null,
+            "director": null
         },
         {
             "id": 7,
@@ -63,16 +60,8 @@
             "descripcion": "jaja",
             "imagen": "kakaka",
             "fecha": "kaakaka",
-            "resenas": [
-                {
-                    "usuario": "yo",
-                    "comentario": "nose",
-                    "analisis": {
-                        "sentimiento": "neutral",
-                        "score": 0.5
-                    }
-                }
-            ]
+            "anio": null,
+            "director": null
         }
     ]
 }
