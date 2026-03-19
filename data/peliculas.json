@@ -2,20 +2,12 @@
     "peliculas": [
         {
             "id": 1,
-            "titulo": "Son como Ni\u00f1os",
+            "titulo": "Son como Niños",
             "descripcion": "Pelicula Loca",
             "imagen": "C:/Users/USUARIO/Downloads/MV5BMDJmYWI5NDctZjM5Zi00NzJiLTk4YTEtZjFhYTZhMTJiYWEzXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
             "fecha": "01/02/2012",
-            "resenas": [
-                {
-                    "usuario": "yo",
-                    "comentario": "pelicula basuraaaa",
-                    "analisis": {
-                        "sentimiento": "neutral",
-                        "score": 0.5
-                    }
-                }
-            ]
+            "anio": null,
+            "director": null
         },
         {
             "id": 2,
@@ -23,15 +15,26 @@
             "descripcion": "robots",
             "imagen": "C:/Users/USUARIO/Downloads/MV5BMDJmYWI5NDctZjM5Zi00NzJiLTk4YTEtZjFhYTZhMTJiYWEzXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
             "fecha": "02/01/2009",
-            "resenas": []
+            "anio": null,
+            "director": null
         },
         {
             "id": 3,
-            "titulo": "son como ni\u00f1os 2",
+            "titulo": "son como niños 2",
             "descripcion": "loca dos",
             "imagen": "https://m.media-amazon.com/images/S/pv-target-images/8bbc7d6e643b7acb2407da63d2824423b62c5db41793f6895c7393292b31b52d.jpg",
             "fecha": "nose",
-            "resenas": []
+            "anio": null,
+            "director": null
+        },
+        {
+            "id": 4,
+            "titulo": "Rapido y Furiosos",
+            "descripcion": "Carreras",
+            "imagen": "C:/Users/USUARIO/Downloads/images.jpg",
+            "fecha": "22/06/2001",
+            "anio": null,
+            "director": null
         }
     ]
 }
