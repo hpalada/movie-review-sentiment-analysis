@@ -16,7 +16,7 @@ import psutil
 
 
 # =====================================
-# CONFIGURACIÓN
+# CONFIGURACIÓN fgfgfgfg
 # =====================================
 
 CONFIG = {
