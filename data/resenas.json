@@ -1,18 +1,6 @@
 {
     "resenas": [
         {
-            "id": 1,
-            "usuario_id": 1,
-            "pelicula_id": 1,
-            "texto": "pelicula basuraaaa",
-            "valoracion_ia": 0.5,
-            "etiquetas_ia": [
-                "neutral"
-            ],
-            "fecha_creacion": "2026-03-19T15:44:47.920853",
-            "fecha_modificacion": null
-        },
-        {
             "id": 2,
             "usuario_id": 1,
             "pelicula_id": 7,

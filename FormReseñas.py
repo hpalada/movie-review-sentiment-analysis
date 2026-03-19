@@ -197,6 +197,14 @@ class FormResenas(QWidget):
             )
             layout_derecha.addWidget(btn_editar)
 
+            btn_eliminar = QPushButton("🗑 Eliminar")
+            btn_eliminar.setFixedHeight(28)
+            btn_eliminar.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_eliminar.clicked.connect(
+                lambda _, r=resena: self._eliminar_resena(r)
+            )
+            layout_derecha.addWidget(btn_eliminar)
+
         layout_tarjeta.addLayout(layout_derecha, stretch=1)
 
         return tarjeta
@@ -228,3 +236,23 @@ class FormResenas(QWidget):
             callback        = self._cargar_resenas
         )
         self.form_ae.show()
+    def _eliminar_resena(self, resena: dict):
+        from PyQt6.QtWidgets import QMessageBox
+
+        confirmacion = QMessageBox.question(
+            self,
+            "Eliminar reseña",
+            "¿Estás seguro de que quieres eliminar esta reseña?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if confirmacion == QMessageBox.StandardButton.Yes:
+            resultado = self.clase_resena.eliminar_resena(
+                resena_id  = resena["id"],
+                usuario_id = self.usuario_id
+            )
+
+            if resultado["exito"]:
+                self._cargar_resenas()   # refresca las tarjetas
+            else:
+                QMessageBox.warning(self, "Error", resultado["mensaje"])
