@@ -1,6 +1,6 @@
 from Json import JsonManager
 from clasePelicula import Pelicula
-from claseResena import Resena
+
 
 class ServicioPeliculas:
     def __init__(self):
@@ -8,7 +8,6 @@ class ServicioPeliculas:
 
     def analizar_sentimiento(self, comentario):
         comentario = comentario.lower()
-
         if "buena" in comentario or "excelente" in comentario:
             return "positivo", 0.9
         elif "mala" in comentario or "horrible" in comentario:
@@ -18,7 +17,6 @@ class ServicioPeliculas:
 
     def agregar_pelicula(self, titulo, descripcion, imagen, fecha):
         data = self.json_manager.cargar_datos()
-
         nueva = Pelicula(
             id=len(data["peliculas"]) + 1,
             titulo=titulo,
@@ -26,22 +24,29 @@ class ServicioPeliculas:
             imagen=imagen,
             fecha=fecha
         )
-
         data["peliculas"].append(nueva.to_dict())
+        self.json_manager.guardar_datos(data)
+
+    def actualizar_pelicula(self, id_pelicula, titulo, descripcion, imagen, fecha):
+        data = self.json_manager.cargar_datos()
+        for peli in data["peliculas"]:
+            if peli["id"] == id_pelicula:
+                peli["titulo"] = titulo
+                peli["descripcion"] = descripcion
+                peli["imagen"] = imagen
+                peli["fecha"] = fecha
+                break
+        self.json_manager.guardar_datos(data)
+
+    def eliminar_pelicula(self, id_pelicula):
+        data = self.json_manager.cargar_datos()
+        data["peliculas"] = [p for p in data["peliculas"] if p["id"] != id_pelicula]
+        # Reasignar IDs
+        for idx, p in enumerate(data["peliculas"], 1):
+            p["id"] = idx
         self.json_manager.guardar_datos(data)
 
     def obtener_peliculas(self):
         return self.json_manager.cargar_datos()["peliculas"]
 
-    def agregar_resena(self, id_pelicula, usuario, comentario):
-        data = self.json_manager.cargar_datos()
-
-        sentimiento, score = self.analizar_sentimiento(comentario)
-
-        for peli in data["peliculas"]:
-            if peli["id"] == id_pelicula:
-                resena = Resena(usuario, comentario, sentimiento, score)
-                peli["resenas"].append(resena.to_dict())
-                break
-
-        self.json_manager.guardar_datos(data)
+   

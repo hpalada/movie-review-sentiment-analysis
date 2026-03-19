@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import *
 from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import Qt
 from catalogoLL import ServicioPeliculas
 
 class MainWindow(QWidget):
@@ -7,13 +8,12 @@ class MainWindow(QWidget):
         super().__init__()
 
         self.servicio = ServicioPeliculas()
-        self.setWindowTitle("Catálogo de Películas - Con Imagen")
-        self.resize(700, 700)
+        
 
         layout = QVBoxLayout()
 
         # ====== Formulario Película ======
-        layout.addWidget(QLabel("Agregar / Editar Película"))
+        layout.addWidget(QLabel("Película"))
 
         self.input_titulo = QLineEdit()
         self.input_titulo.setPlaceholderText("Título")
@@ -36,20 +36,25 @@ class MainWindow(QWidget):
         self.label_imagen.setScaledContents(True)
 
         self.input_fecha = QLineEdit()
-        self.input_fecha.setPlaceholderText("Fecha")
+        self.input_fecha.setPlaceholderText("Fecha de publicacion")
 
         # Botones CRUD
         btn_layout = QHBoxLayout()
-        self.btn_guardar = QPushButton("Guardar / Actualizar")
-        self.btn_guardar.clicked.connect(self.guardar_pelicula)
+        self.btn_guardar = QPushButton("Guardar")  # Cambia a “Actualizar” al seleccionar
+        self.btn_guardar.clicked.connect(self.guardar_o_actualizar)
         self.btn_eliminar = QPushButton("Eliminar")
         self.btn_eliminar.clicked.connect(self.eliminar_pelicula)
         self.btn_limpiar = QPushButton("Limpiar")
         self.btn_limpiar.clicked.connect(self.limpiar_campos)
+        self.btn_buscar = QPushButton("Buscar Película")
+        self.btn_buscar.clicked.connect(self.buscar_pelicula)
+
         btn_layout.addWidget(self.btn_guardar)
         btn_layout.addWidget(self.btn_eliminar)
         btn_layout.addWidget(self.btn_limpiar)
+        btn_layout.addWidget(self.btn_buscar)
 
+        # Añadir widgets al layout principal
         layout.addWidget(self.input_titulo)
         layout.addWidget(self.input_desc)
         layout.addLayout(img_layout)
@@ -57,62 +62,10 @@ class MainWindow(QWidget):
         layout.addWidget(self.input_fecha)
         layout.addLayout(btn_layout)
 
-        # ====== Buscar ======
-        search_layout = QHBoxLayout()
-        self.input_buscar = QLineEdit()
-        self.input_buscar.setPlaceholderText("Buscar por título")
-        self.btn_buscar = QPushButton("Buscar")
-        self.btn_buscar.clicked.connect(self.buscar_pelicula)
-        search_layout.addWidget(self.input_buscar)
-        search_layout.addWidget(self.btn_buscar)
-        layout.addLayout(search_layout)
-
-        # ====== Lista Películas ======
-        layout.addWidget(QLabel("Películas"))
-        self.lista = QListWidget()
-        self.lista.itemClicked.connect(self.seleccionar_pelicula)
-        layout.addWidget(self.lista)
-
-        # ====== Formulario Reseña ======
-        layout.addWidget(QLabel("Agregar Reseña"))
-        self.input_usuario = QLineEdit()
-        self.input_usuario.setPlaceholderText("Usuario")
-        self.input_comentario = QTextEdit()
-        self.input_comentario.setPlaceholderText("Comentario")
-        self.btn_agregar_resena = QPushButton("Agregar Reseña")
-        self.btn_agregar_resena.clicked.connect(self.agregar_resena)
-
-        layout.addWidget(self.input_usuario)
-        layout.addWidget(self.input_comentario)
-        layout.addWidget(self.btn_agregar_resena)
-
         self.setLayout(layout)
-
         self.id_pelicula_seleccionada = None
-        self.cargar_peliculas()
 
     # ==================== Funciones ====================
-
-    def cargar_peliculas(self, peliculas=None):
-        self.lista.clear()
-        if peliculas is None:
-            peliculas = self.servicio.obtener_peliculas()
-        for peli in peliculas:
-            item = QListWidgetItem(f"{peli['id']} - {peli['titulo']}")
-            item.setData(1, peli["id"])
-            self.lista.addItem(item)
-
-    def seleccionar_pelicula(self, item):
-        self.id_pelicula_seleccionada = item.data(1)
-        peliculas = self.servicio.obtener_peliculas()
-        for peli in peliculas:
-            if peli["id"] == self.id_pelicula_seleccionada:
-                self.input_titulo.setText(peli["titulo"])
-                self.input_desc.setText(peli["descripcion"])
-                self.input_imagen.setText(peli["imagen"])
-                self.input_fecha.setText(peli["fecha"])
-                self.mostrar_imagen(peli["imagen"])
-                break
 
     def seleccionar_imagen(self):
         archivo, _ = QFileDialog.getOpenFileName(
@@ -125,7 +78,12 @@ class MainWindow(QWidget):
     def mostrar_imagen(self, ruta):
         pixmap = QPixmap(ruta)
         if not pixmap.isNull():
-            self.label_imagen.setPixmap(pixmap)
+            self.label_imagen.setPixmap(pixmap.scaled(
+                self.label_imagen.width(),
+                self.label_imagen.height(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            ))
         else:
             self.label_imagen.clear()
 
@@ -135,11 +93,10 @@ class MainWindow(QWidget):
         self.input_imagen.clear()
         self.label_imagen.clear()
         self.input_fecha.clear()
-        self.input_buscar.clear()
         self.id_pelicula_seleccionada = None
-        self.cargar_peliculas()
+        self.btn_guardar.setText("Guardar")
 
-    def guardar_pelicula(self):
+    def guardar_o_actualizar(self):
         titulo = self.input_titulo.text()
         desc = self.input_desc.text()
         img = self.input_imagen.text()
@@ -149,12 +106,12 @@ class MainWindow(QWidget):
             QMessageBox.warning(self, "Error", "El título es obligatorio")
             return
 
-        if self.id_pelicula_seleccionada:
+        if self.id_pelicula_seleccionada:  # Actualizar
             self.servicio.actualizar_pelicula(
                 self.id_pelicula_seleccionada, titulo, desc, img, fecha
             )
-            QMessageBox.information(self, "Éxito", "Película actualizada")
-        else:
+            QMessageBox.information(self, "Éxito", "Película editada")
+        else:  # Guardar nueva
             self.servicio.agregar_pelicula(titulo, desc, img, fecha)
             QMessageBox.information(self, "Éxito", "Película agregada")
 
@@ -174,26 +131,27 @@ class MainWindow(QWidget):
             self.limpiar_campos()
 
     def buscar_pelicula(self):
-        termino = self.input_buscar.text().lower()
-        if not termino:
-            self.cargar_peliculas()
-            return
         peliculas = self.servicio.obtener_peliculas()
-        filtradas = [p for p in peliculas if termino in p["titulo"].lower()]
-        self.cargar_peliculas(filtradas)
+        titulos = [f"{p['id']} - {p['titulo']}" for p in peliculas]
 
-    def agregar_resena(self):
-        if not self.id_pelicula_seleccionada:
-            QMessageBox.warning(self, "Error", "Selecciona una película primero")
+        if not titulos:
+            QMessageBox.information(self, "Info", "No hay películas guardadas")
             return
-        usuario = self.input_usuario.text()
-        comentario = self.input_comentario.toPlainText()
-        if not usuario or not comentario:
-            QMessageBox.warning(self, "Error", "Completa todos los campos")
-            return
-        self.servicio.agregar_resena(
-            self.id_pelicula_seleccionada, usuario, comentario
+
+        item, ok = QInputDialog.getItem(
+            self, "Seleccionar Película", "Películas:", titulos, 0, False
         )
-        QMessageBox.information(self, "Éxito", "Reseña agregada")
-        self.input_usuario.clear()
-        self.input_comentario.clear()
+
+        if ok and item:
+            id_sel = int(item.split(" - ")[0])
+            self.id_pelicula_seleccionada = id_sel
+
+            for peli in peliculas:
+                if peli["id"] == id_sel:
+                    self.input_titulo.setText(peli["titulo"])
+                    self.input_desc.setText(peli["descripcion"])
+                    self.input_imagen.setText(peli["imagen"])
+                    self.input_fecha.setText(peli["fecha"])
+                    self.mostrar_imagen(peli["imagen"])
+                    self.btn_guardar.setText("Actualizar")
+                    break
