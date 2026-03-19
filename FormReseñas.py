@@ -7,13 +7,14 @@ from PyQt6.QtGui import QPixmap
 
 
 class FormResenas(QWidget):
-
-    def __init__(self, pelicula_id: int, usuario_id: int, clase_pelicula, clase_resena):
+    def __init__(self, pelicula_id: int, usuario_id: int, clase_pelicula,
+                 clase_resena, titulo_pelicula: str = ""):
         super().__init__()
-        self.pelicula_id    = pelicula_id
-        self.usuario_id     = usuario_id
-        self.clase_pelicula = clase_pelicula   # instancia de ClasePelicula
-        self.clase_resena   = clase_resena     # instancia de Resena
+        self.pelicula_id     = pelicula_id
+        self.usuario_id      = usuario_id
+        self.clase_pelicula  = clase_pelicula
+        self.clase_resena    = clase_resena
+        self.titulo_pelicula = titulo_pelicula
 
         self.setWindowTitle("Reseñas")
         self.resize(1100, 750)
@@ -25,12 +26,10 @@ class FormResenas(QWidget):
     # ─────────────────────────────────────────
 
     def _construir_ui(self):
-        # Layout raíz — ocupa toda la ventana
         layout_raiz = QVBoxLayout(self)
         layout_raiz.setContentsMargins(0, 0, 0, 0)
         layout_raiz.setSpacing(0)
 
-        # ── Área scrolleable (todo excepto el botón fijo) ──
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
@@ -40,27 +39,22 @@ class FormResenas(QWidget):
         self.layout_scroll.setContentsMargins(20, 20, 20, 20)
         self.layout_scroll.setSpacing(16)
 
-        # Sección de cabecera (poster + info película)
         self.widget_cabecera = self._crear_cabecera()
         self.layout_scroll.addWidget(self.widget_cabecera)
 
-        # Separador
         separador = QFrame()
         separador.setFrameShape(QFrame.Shape.HLine)
         self.layout_scroll.addWidget(separador)
 
-        # Contenedor de tarjetas de reseñas
         self.layout_resenas = QVBoxLayout()
         self.layout_resenas.setSpacing(12)
         self.layout_scroll.addLayout(self.layout_resenas)
 
-        # Espaciador al final del scroll
         self.layout_scroll.addStretch()
 
         self.scroll_area.setWidget(self.contenido_scroll)
         layout_raiz.addWidget(self.scroll_area)
 
-        # ── Botón fijo en la parte inferior ──
         self.btn_agregar = QPushButton("AGREGAR RESEÑA")
         self.btn_agregar.setFixedHeight(55)
         self.btn_agregar.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -73,18 +67,16 @@ class FormResenas(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(20)
 
-        # Poster
         self.lbl_poster = QLabel("POSTER")
         self.lbl_poster.setFixedSize(190, 270)
         self.lbl_poster.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_poster.setFrameShape(QFrame.Shape.Box)
         layout.addWidget(self.lbl_poster)
 
-        # Info de la película
         layout_info = QVBoxLayout()
         layout_info.setSpacing(8)
 
-        self.lbl_nombre    = QLabel("NOMBRE PELÍCULA")
+        self.lbl_nombre    = QLabel(self.titulo_pelicula or "NOMBRE PELÍCULA")
         self.lbl_promedio  = QLabel("RESEÑA AVERAGE")
         self.lbl_etiquetas = QLabel("ETIQUETA AVERAGE")
 
@@ -107,9 +99,12 @@ class FormResenas(QWidget):
         self._cargar_resenas()
 
     def _cargar_info_pelicula(self):
-        """Consulta la película a través de la capa intermedia y actualiza la cabecera."""
-        info = self.clase_pelicula.obtener_info_pelicula(self.pelicula_id)
+        # Si no hay capa intermedia aún, usamos el título que llegó por parámetro
+        if not self.clase_pelicula:
+            self.lbl_nombre.setText(self.titulo_pelicula or "Sin título")
+            return
 
+        info = self.clase_pelicula.obtener_info_pelicula(self.pelicula_id)
         if not info:
             return
 
@@ -117,7 +112,6 @@ class FormResenas(QWidget):
         self.lbl_promedio.setText(f"Valoración promedio: {info.get('promedio', 'N/A')} / 5")
         self.lbl_etiquetas.setText(f"Etiquetas: {', '.join(info.get('etiquetas_frecuentes', []))}")
 
-        # Poster — si hay ruta de imagen
         ruta_poster = info.get("poster", None)
         if ruta_poster:
             pixmap = QPixmap(ruta_poster)
@@ -128,8 +122,6 @@ class FormResenas(QWidget):
                 )
 
     def _cargar_resenas(self):
-        """Consulta las reseñas de la película y construye las tarjetas."""
-        # Limpiar tarjetas anteriores
         while self.layout_resenas.count():
             item = self.layout_resenas.takeAt(0)
             if item.widget():
@@ -188,7 +180,7 @@ class FormResenas(QWidget):
         layout_etiquetas.addStretch()
         layout_tarjeta.addLayout(layout_etiquetas, stretch=2)
 
-        # ── Columna derecha: valoración (+ botón editar si es del usuario) ──
+        # ── Columna derecha: valoración + botón editar ──
         layout_derecha = QVBoxLayout()
         layout_derecha.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -196,7 +188,6 @@ class FormResenas(QWidget):
         lbl_valoracion.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout_derecha.addWidget(lbl_valoracion)
 
-        # Botón editar — solo si la reseña pertenece al usuario actual
         if resena.get("usuario_id") == self.usuario_id:
             btn_editar = QPushButton("✏ Editar")
             btn_editar.setFixedHeight(28)
@@ -217,21 +208,23 @@ class FormResenas(QWidget):
     def _abrir_form_agregar(self):
         from FormAgregaryEditar import FormAgregaryEditar
         self.form_ae = FormAgregaryEditar(
-            pelicula_id = self.pelicula_id,
-            usuario_id  = self.usuario_id,
-            clase_resena= self.clase_resena,
-            resena      = None,              # None indica que es una reseña nueva
-            callback    = self._cargar_resenas
+            pelicula_id     = self.pelicula_id,
+            usuario_id      = self.usuario_id,
+            clase_resena    = self.clase_resena,
+            titulo_pelicula = self.titulo_pelicula,
+            resena          = None,
+            callback        = self._cargar_resenas
         )
         self.form_ae.show()
 
     def _abrir_form_editar(self, resena: dict):
         from FormAgregaryEditar import FormAgregaryEditar
         self.form_ae = FormAgregaryEditar(
-            pelicula_id = self.pelicula_id,
-            usuario_id  = self.usuario_id,
-            clase_resena= self.clase_resena,
-            resena      = resena,            # pasa la reseña existente para precargar
-            callback    = self._cargar_resenas
+            pelicula_id     = self.pelicula_id,
+            usuario_id      = self.usuario_id,
+            clase_resena    = self.clase_resena,
+            titulo_pelicula = self.titulo_pelicula,
+            resena          = resena,
+            callback        = self._cargar_resenas
         )
         self.form_ae.show()
