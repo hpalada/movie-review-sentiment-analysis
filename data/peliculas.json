@@ -40,6 +40,39 @@
             "imagen": "fdgsdg",
             "fecha": "32423",
             "resenas": []
+        },
+        {
+            "id": 5,
+            "titulo": "",
+            "descripcion": "desc",
+            "imagen": "img",
+            "fecha": "2025",
+            "resenas": []
+        },
+        {
+            "id": 6,
+            "titulo": "4",
+            "descripcion": "desc",
+            "imagen": "img",
+            "fecha": "2025",
+            "resenas": []
+        },
+        {
+            "id": 7,
+            "titulo": "jaja",
+            "descripcion": "jaja",
+            "imagen": "kakaka",
+            "fecha": "kaakaka",
+            "resenas": [
+                {
+                    "usuario": "yo",
+                    "comentario": "nose",
+                    "analisis": {
+                        "sentimiento": "neutral",
+                        "score": 0.5
+                    }
+                }
+            ]
         }
     ]
 }
