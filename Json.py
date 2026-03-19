@@ -5,7 +5,7 @@ from datetime import datetime
 
 class JsonManager:
     def __init__(self):
-        self.carpeta          = "data"
+        self.carpeta           = "data"
         self.archivo_peliculas = f"{self.carpeta}/peliculas.json"
         self.archivo_usuarios  = f"{self.carpeta}/usuarios.json"
         self.archivo_resenas   = f"{self.carpeta}/resenas.json"
@@ -95,7 +95,6 @@ class JsonManager:
                          fecha=None, anio=None, director=None):
         data = self._cargar(self.archivo_peliculas)
 
-        # Reutiliza si ya existe con ese título
         existente = next(
             (p for p in data["peliculas"]
              if p["titulo"].lower() == titulo.lower()), None
@@ -133,7 +132,7 @@ class JsonManager:
                 self._guardar(self.archivo_peliculas, data)
                 return pelicula
 
-        return None  # No encontrada
+        return None
 
     def eliminar_pelicula(self, pelicula_id):
         data = self._cargar(self.archivo_peliculas)
@@ -142,7 +141,6 @@ class JsonManager:
 
         if len(data["peliculas"]) < antes:
             self._guardar(self.archivo_peliculas, data)
-            # Eliminar también todas sus reseñas
             self._eliminar_resenas_de_pelicula(pelicula_id)
             return True
         return False
@@ -201,7 +199,7 @@ class JsonManager:
                 self._guardar(self.archivo_resenas, data)
                 return resena
 
-        return None  # No encontrada
+        return None
 
     def eliminar_resena(self, resena_id, usuario_id):
         data = self._cargar(self.archivo_resenas)
@@ -222,3 +220,76 @@ class JsonManager:
         data = self._cargar(self.archivo_resenas)
         data["resenas"] = [r for r in data["resenas"] if r["pelicula_id"] != pelicula_id]
         self._guardar(self.archivo_resenas, data)
+
+    # ─────────────────────────────────────────
+    #  MIGRACIÓN DEL JSON ANTIGUO
+    # ─────────────────────────────────────────
+
+    def migrar_json_antiguo(self, ruta_json_antiguo: str):
+        """
+        Lee el JSON antiguo (1 solo archivo con todo embebido)
+        y migra los datos a los 3 archivos separados.
+        Solo migra si los archivos destino están vacíos para no duplicar datos.
+        """
+        if not os.path.exists(ruta_json_antiguo):
+            print(f"❌ No se encontró el archivo: {ruta_json_antiguo}")
+            return False
+
+        with open(ruta_json_antiguo, "r", encoding="utf-8") as f:
+            datos_antiguos = json.load(f)
+
+        peliculas_antiguas = datos_antiguos.get("peliculas", [])
+
+        data_peliculas = self._cargar(self.archivo_peliculas)
+        data_usuarios  = self._cargar(self.archivo_usuarios)
+        data_resenas   = self._cargar(self.archivo_resenas)
+
+        if data_peliculas["peliculas"] or data_usuarios["usuarios"] or data_resenas["resenas"]:
+            print("⚠ Los archivos destino ya tienen datos. Migración cancelada para evitar duplicados.")
+            return False
+
+        usuario_migrado = {
+            "id"             : 1,
+            "nombre_usuario" : "yo",
+            "contrasena_hash": "migrado_sin_hash",
+            "fecha_registro" : datetime.now().isoformat()
+        }
+        data_usuarios["usuarios"].append(usuario_migrado)
+
+        id_resena = 1
+
+        for pelicula in peliculas_antiguas:
+            nueva_pelicula = {
+                "id"         : pelicula.get("id"),
+                "titulo"     : pelicula.get("titulo", ""),
+                "descripcion": pelicula.get("descripcion", None),
+                "imagen"     : pelicula.get("imagen", None),
+                "fecha"      : pelicula.get("fecha", None),
+                "anio"       : None,
+                "director"   : None
+            }
+            data_peliculas["peliculas"].append(nueva_pelicula)
+
+            for resena_antigua in pelicula.get("resenas", []):
+                nueva_resena = {
+                    "id"                : id_resena,
+                    "usuario_id"        : 1,
+                    "pelicula_id"       : pelicula["id"],
+                    "texto"             : resena_antigua.get("comentario", ""),
+                    "valoracion_ia"     : resena_antigua.get("analisis", {}).get("score", 0.0),
+                    "etiquetas_ia"      : [resena_antigua.get("analisis", {}).get("sentimiento", "neutral")],
+                    "fecha_creacion"    : datetime.now().isoformat(),
+                    "fecha_modificacion": None
+                }
+                data_resenas["resenas"].append(nueva_resena)
+                id_resena += 1
+
+        self._guardar(self.archivo_peliculas, data_peliculas)
+        self._guardar(self.archivo_usuarios,  data_usuarios)
+        self._guardar(self.archivo_resenas,   data_resenas)
+
+        print(f"✅ Migración completa:")
+        print(f"   • {len(data_peliculas['peliculas'])} películas migradas")
+        print(f"   • {len(data_usuarios['usuarios'])} usuario migrado")
+        print(f"   • {len(data_resenas['resenas'])} reseñas migradas")
+        return True
