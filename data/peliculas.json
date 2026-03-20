@@ -20,19 +20,46 @@
         },
         {
             "id": 3,
-            "titulo": "son como niños 2",
-            "descripcion": "loca dos",
-            "imagen": "https://m.media-amazon.com/images/S/pv-target-images/8bbc7d6e643b7acb2407da63d2824423b62c5db41793f6895c7393292b31b52d.jpg",
-            "fecha": "nose",
+            "titulo": "nose",
+            "descripcion": "nose",
+            "imagen": "\"C:\\Users\\USUARIO\\Downloads\\MV5BMDJmYWI5NDctZjM5Zi00NzJiLTk4YTEtZjFhYTZhMTJiYWEzXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg\"",
+            "fecha": "02/01/2008",
             "anio": null,
             "director": null
         },
         {
             "id": 4,
-            "titulo": "Rapido y Furiosos",
-            "descripcion": "Carreras",
-            "imagen": "C:/Users/USUARIO/Downloads/images.jpg",
-            "fecha": "22/06/2001",
+            "titulo": "jhfslg",
+            "descripcion": "fsdgf",
+            "imagen": "fdgsdg",
+            "fecha": "32423",
+            "anio": null,
+            "director": null
+        },
+        {
+            "id": 5,
+            "titulo": "",
+            "descripcion": "desc",
+            "imagen": "img",
+            "fecha": "2025",
+            "anio": null,
+            "director": null
+        },
+        {
+            "id": 6,
+            "titulo": "4",
+            "descripcion": "desc",
+            "imagen": "img",
+            "fecha": "2025",
+            "anio": null,
+            "director": null
+        },
+        {
+            "id": 7,
+            "titulo": "jaja",
+            "descripcion": "jaja",
+            "imagen": "kakaka",
+            "fecha": "kaakaka",
             "anio": null,
             "director": null
         }

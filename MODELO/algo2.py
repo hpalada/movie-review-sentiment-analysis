@@ -132,9 +132,10 @@ def extract_features(text):
 # RUTAS DE LOS ARCHIVOS GUARDADOS
 # =====================================
 
-RUTA_VECTORIZER  = "vectorizer.pkl"
-RUTA_LR_MODEL    = "lr_model.pkl"
-RUTA_RIDGE_MODEL = "ridge_model.pkl"
+_dir = os.path.dirname(os.path.abspath(__file__))
+RUTA_VECTORIZER  = os.path.join(_dir, "vectorizer.pkl")
+RUTA_LR_MODEL    = os.path.join(_dir, "lr_model.pkl")
+RUTA_RIDGE_MODEL = os.path.join(_dir, "ridge_model.pkl")
 
 modelos_existen = (
     os.path.exists(RUTA_VECTORIZER) and
@@ -162,7 +163,9 @@ else:
     data = pd.read_csv("DataSetFinal.csv", sep=";")
     print("Dataset cargado")
 
-    data = data[["reviewText", "Personalizado"]]
+    # Ruta absoluta relativa a donde está algo2.py
+    _dir = os.path.dirname(os.path.abspath(__file__))
+    data = pd.read_csv(os.path.join(_dir, "DataSetFinal.csv"), sep=";")
     data.columns = ["review", "score"]
 
     data["clean_review"] = data["review"].apply(clean_text)
@@ -204,37 +207,3 @@ else:
     print("Modelos guardados para próximas ejecuciones.")
 
 
-# =====================================
-# INTERFAZ PARA USUARIO
-# =====================================
-
-print("\nModelos listos.")
-print("Escribe una reseña para obtener una puntuación sobre 5.")
-print("Escribe 'salir' para terminar.\n")
-
-while True:
-
-    review = input("Reseña: ")
-
-    if review.lower() == "salir":
-        break
-
-    clean = clean_text(review)
-    review_tfidf = vectorizer.transform([clean])
-
-    extra = np.array(extract_features(review)).reshape(1, -1)
-    review_extra = csr_matrix(extra)
-
-    review_vec = hstack([review_tfidf, review_extra])
-
-    lr_score = lr_model.predict(review_vec)[0]
-    lr_score = max(0, min(5, lr_score))
-
-    ridge_score = ridge_model.predict(review_vec)[0]
-    ridge_score = max(0, min(5, ridge_score))
-
-    emotions = detect_emotions(review)
-
-    print(f"  Linear Regression : {round(lr_score, 2)} / 5")
-    print(f"  Ridge Regression  : {round(ridge_score, 2)} / 5")
-    print(f"  Emociones         : {', '.join(emotions)}\n")
