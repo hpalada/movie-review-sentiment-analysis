@@ -17,6 +17,17 @@ from datetime import datetime
 
 
 class ClaseUsuario:
+    """
+    Representa a un usuario del sistema.
+
+    Atributos
+    ----------
+    nombre_usuario : str – Nombre de usuario.
+    email          : str – Correo electrónico (clave única).
+    password       : str – Hash SHA-256 de la contraseña.
+    creado         : str – Fecha/hora de creación (ISO 8601).
+    """
+
     def __init__(self, nombre_usuario: str, email: str,
                  password_hash: str, creado: str = None):
         self.nombre_usuario = nombre_usuario.strip()
@@ -30,6 +41,7 @@ class ClaseUsuario:
                 f"email={self.email!r}, "
                 f"creado={self.creado!r})")
 
+    # ── Serialización ─────────────────────────────────────────────────────────
     def to_dict(self) -> dict:
         """Convierte el objeto a diccionario para guardarlo en el JSON."""
         return {
