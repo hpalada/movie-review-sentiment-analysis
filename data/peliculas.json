@@ -4,7 +4,7 @@
             "id": 1,
             "titulo": "Son como Niños",
             "descripcion": "Pelicula Loca",
-            "imagen": "\"C:\\Users\\USUARIO\\Downloads\\MV5BMDJmYWI5NDctZjM5Zi00NzJiLTk4YTEtZjFhYTZhMTJiYWEzXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg\"",
+            "imagen": "C:/Users/USUARIO/Downloads/MV5BMDJmYWI5NDctZjM5Zi00NzJiLTk4YTEtZjFhYTZhMTJiYWEzXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
             "fecha": "01/02/2012",
             "anio": null,
             "director": null
@@ -13,7 +13,7 @@
             "id": 2,
             "titulo": "Transformers",
             "descripcion": "robots",
-            "imagen": "\"C:\\Users\\USUARIO\\Downloads\\MV5BMDJmYWI5NDctZjM5Zi00NzJiLTk4YTEtZjFhYTZhMTJiYWEzXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg\"",
+            "imagen": "C:/Users/USUARIO/Downloads/MV5BMDJmYWI5NDctZjM5Zi00NzJiLTk4YTEtZjFhYTZhMTJiYWEzXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
             "fecha": "02/01/2009",
             "anio": null,
             "director": null

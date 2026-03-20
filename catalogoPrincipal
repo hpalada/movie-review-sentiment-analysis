@@ -1,0 +1,604 @@
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QLineEdit, QScrollArea, QFrame, QGridLayout, QSizePolicy,
+    QMessageBox, QApplication
+)
+from PyQt6.QtGui import QPixmap, QFont, QColor, QPalette, QCursor, QIcon
+from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal, QThread
+
+import os
+import sys
+
+# ── Importamos la capa de modelo ──────────────────────────────────────
+# Si no existe pelicula.py, usamos JsonManager directamente como fallback
+try:
+    from clasePelicula import Pelicula
+    def _get_all():  return Pelicula.todas()
+    def _search(q):
+        return [p for p in Pelicula.todas()
+                if q.lower() in p.titulo.lower()]
+    def _del(p): p.eliminar()
+    USE_MODEL = True
+except ImportError:
+    from Json import JsonManager
+    _db = JsonManager()
+    class _FakePelicula:
+        def __init__(self, d):
+            self.__dict__.update(d)
+        def eliminar(self):
+            _db.eliminar_pelicula(self.id)
+    def _get_all():
+        return [_FakePelicula(d) for d in _db.obtener_peliculas()]
+    def _search(q):
+        return [p for p in _get_all() if q.lower() in p.titulo.lower()]
+    def _del(p): p.eliminar()
+    USE_MODEL = False
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  TARJETA DE PELÍCULA
+# ══════════════════════════════════════════════════════════════════════
+class MovieCard(QFrame):
+    explore_clicked = pyqtSignal(object)   # emite el objeto pelicula
+    deleted         = pyqtSignal(object)
+
+    def __init__(self, pelicula, parent=None):
+        super().__init__(parent)
+        self.pelicula = pelicula
+        self._build()
+
+    def _build(self):
+        self.setFixedSize(220, 280)
+        self.setObjectName("MovieCard")
+        self.setStyleSheet("""
+            QFrame#MovieCard {
+                background: #1e2130;
+                border-radius: 14px;
+                border: 1px solid #2a2f45;
+            }
+            QFrame#MovieCard:hover {
+                border: 1px solid #00c8b4;
+            }
+        """)
+        self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 12)
+        root.setSpacing(0)
+
+        # ── Imagen ────────────────────────────────────────────────────
+        self.img_label = QLabel()
+        self.img_label.setFixedSize(220, 160)
+        self.img_label.setScaledContents(True)
+        self.img_label.setStyleSheet(
+            "border-top-left-radius: 14px;"
+            "border-top-right-radius: 14px;"
+            "background: #12141f;"
+        )
+        self._cargar_imagen()
+        root.addWidget(self.img_label)
+
+        # ── Fila título + estrella ────────────────────────────────────
+        fila = QHBoxLayout()
+        fila.setContentsMargins(10, 8, 10, 4)
+
+        titulo = QLabel(self.pelicula.titulo or "Sin título")
+        titulo.setStyleSheet("color:#e8eaf0; font-size:13px; font-weight:600;")
+        titulo.setWordWrap(False)
+        titulo.setMaximumWidth(170)
+        titulo.setSizePolicy(QSizePolicy.Policy.Expanding,
+                             QSizePolicy.Policy.Preferred)
+
+        star = QLabel("★")
+        star.setStyleSheet("color:#00c8b4; font-size:16px;")
+        star.setFixedWidth(20)
+
+        fila.addWidget(titulo)
+        fila.addWidget(star)
+        root.addLayout(fila)
+
+        # Año / director (opcional)
+        meta = ""
+        if hasattr(self.pelicula, "anio") and self.pelicula.anio:
+            meta = str(self.pelicula.anio)
+        if hasattr(self.pelicula, "director") and self.pelicula.director:
+            meta = (meta + "  ·  " + self.pelicula.director) if meta \
+                   else self.pelicula.director
+        if meta:
+            lbl_meta = QLabel(meta)
+            lbl_meta.setContentsMargins(10, 0, 10, 2)
+            lbl_meta.setStyleSheet("color:#6b7080; font-size:11px;")
+            root.addWidget(lbl_meta)
+
+        root.addStretch()
+
+        # ── Botón Explorar ────────────────────────────────────────────
+        btn = QPushButton("Explore & Review")
+        btn.setFixedHeight(32)
+        btn.setStyleSheet("""
+            QPushButton {
+                background: #00c8b4;
+                color: #0d0f1a;
+                border: none;
+                border-radius: 8px;
+                font-size: 12px;
+                font-weight: 700;
+                margin: 0 10px;
+            }
+            QPushButton:hover { background: #00e5cf; }
+            QPushButton:pressed { background: #009e8d; }
+        """)
+        btn.clicked.connect(lambda: self.explore_clicked.emit(self.pelicula))
+        root.addWidget(btn)
+
+    def _cargar_imagen(self):
+        ruta = getattr(self.pelicula, "imagen", None)
+        if ruta and os.path.exists(ruta):
+            px = QPixmap(ruta)
+            if not px.isNull():
+                self.img_label.setPixmap(px)
+                return
+        # Placeholder con las iniciales del título
+        self.img_label.setText(
+            (self.pelicula.titulo or "?")[:2].upper()
+        )
+        self.img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.img_label.setStyleSheet(
+            "border-top-left-radius:14px; border-top-right-radius:14px;"
+            "background:#12141f; color:#2a2f45; font-size:40px; font-weight:800;"
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  DIÁLOGO DETALLE
+# ══════════════════════════════════════════════════════════════════════
+class DetailDialog(QWidget):
+    request_edit    = pyqtSignal(object)
+    request_delete  = pyqtSignal(object)
+
+    def __init__(self, pelicula, parent=None):
+        super().__init__(parent,
+            Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        self.pelicula = pelicula
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self._build()
+        self.setFixedSize(460, 540)
+
+    def _build(self):
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        card = QFrame()
+        card.setStyleSheet("""
+            QFrame {
+                background: #1a1d2e;
+                border-radius: 18px;
+                border: 1px solid #2a2f45;
+            }
+        """)
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(0, 0, 0, 20)
+        layout.setSpacing(0)
+
+        # Imagen grande
+        img = QLabel()
+        img.setFixedSize(460, 240)
+        img.setScaledContents(True)
+        img.setStyleSheet(
+            "border-top-left-radius:18px; border-top-right-radius:18px;"
+            "background:#12141f;"
+        )
+        ruta = getattr(self.pelicula, "imagen", None)
+        if ruta and os.path.exists(ruta):
+            px = QPixmap(ruta)
+            if not px.isNull():
+                img.setPixmap(px)
+        else:
+            img.setText((self.pelicula.titulo or "?")[:2].upper())
+            img.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            img.setStyleSheet(
+                "border-top-left-radius:18px; border-top-right-radius:18px;"
+                "background:#12141f; color:#2a2f45; font-size:60px; font-weight:900;"
+            )
+        layout.addWidget(img)
+
+        # Contenido
+        content = QVBoxLayout()
+        content.setContentsMargins(24, 16, 24, 0)
+        content.setSpacing(8)
+
+        titulo = QLabel(self.pelicula.titulo or "Sin título")
+        titulo.setStyleSheet(
+            "color:#e8eaf0; font-size:22px; font-weight:800;"
+        )
+        content.addWidget(titulo)
+
+        # Meta (año · director)
+        metas = []
+        if getattr(self.pelicula, "anio", None):
+            metas.append(str(self.pelicula.anio))
+        if getattr(self.pelicula, "director", None):
+            metas.append(self.pelicula.director)
+        if getattr(self.pelicula, "fecha", None):
+            metas.append(self.pelicula.fecha)
+        if metas:
+            meta_lbl = QLabel("  ·  ".join(metas))
+            meta_lbl.setStyleSheet("color:#00c8b4; font-size:12px;")
+            content.addWidget(meta_lbl)
+
+        if getattr(self.pelicula, "descripcion", None):
+            desc = QLabel(self.pelicula.descripcion)
+            desc.setWordWrap(True)
+            desc.setStyleSheet("color:#9097b0; font-size:13px; line-height:1.5;")
+            content.addWidget(desc)
+
+        content.addStretch()
+
+        # Botones
+        btns = QHBoxLayout()
+        btns.setSpacing(10)
+
+        btn_edit = QPushButton("✏  Editar")
+        btn_edit.setFixedHeight(36)
+        btn_edit.setStyleSheet("""
+            QPushButton {
+                background:#2a2f45; color:#e8eaf0;
+                border:none; border-radius:8px;
+                font-size:13px; font-weight:600;
+            }
+            QPushButton:hover { background:#3a4060; }
+        """)
+        btn_edit.clicked.connect(lambda: (
+            self.request_edit.emit(self.pelicula), self.close()
+        ))
+
+        btn_del = QPushButton("🗑  Eliminar")
+        btn_del.setFixedHeight(36)
+        btn_del.setStyleSheet("""
+            QPushButton {
+                background:#3d1a1a; color:#e05555;
+                border:1px solid #7a2222; border-radius:8px;
+                font-size:13px; font-weight:600;
+            }
+            QPushButton:hover { background:#5a2020; }
+        """)
+        btn_del.clicked.connect(lambda: (
+            self.request_delete.emit(self.pelicula), self.close()
+        ))
+
+        btn_close = QPushButton("✕")
+        btn_close.setFixedSize(36, 36)
+        btn_close.setStyleSheet("""
+            QPushButton {
+                background:#2a2f45; color:#9097b0;
+                border:none; border-radius:8px; font-size:14px;
+            }
+            QPushButton:hover { background:#3a4060; color:#e8eaf0; }
+        """)
+        btn_close.clicked.connect(self.close)
+
+        btns.addWidget(btn_edit)
+        btns.addWidget(btn_del)
+        btns.addStretch()
+        btns.addWidget(btn_close)
+        content.addLayout(btns)
+
+        layout.addLayout(content)
+        outer.addWidget(card)
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  TARJETA "AGREGAR PELÍCULA"
+# ══════════════════════════════════════════════════════════════════════
+class AddMovieCard(QFrame):
+    clicked = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(220, 280)
+        self.setObjectName("AddMovieCard")
+        self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.setStyleSheet("""
+            QFrame#AddMovieCard {
+                background: #13162200;
+                border-radius: 14px;
+                border: 2px dashed #2a2f45;
+            }
+            QFrame#AddMovieCard:hover {
+                background: #1a1f3a;
+                border: 2px dashed #00c8b4;
+            }
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(12)
+
+        icon = QLabel("＋")
+        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon.setStyleSheet(
+            "color:#2a2f45; font-size:52px; font-weight:300; border:none;"
+        )
+        icon.setObjectName("AddIcon")
+
+        text = QLabel("Agregar película")
+        text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        text.setStyleSheet(
+            "color:#3a4565; font-size:13px; font-weight:600; border:none;"
+        )
+        text.setObjectName("AddText")
+
+        layout.addWidget(icon)
+        layout.addWidget(text)
+
+        # Hover: cambiar colores de los hijos dinámicamente
+        self._icon = icon
+        self._text = text
+
+    def enterEvent(self, event):
+        self._icon.setStyleSheet(
+            "color:#00c8b4; font-size:52px; font-weight:300; border:none;"
+        )
+        self._text.setStyleSheet(
+            "color:#00c8b4; font-size:13px; font-weight:600; border:none;"
+        )
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._icon.setStyleSheet(
+            "color:#2a2f45; font-size:52px; font-weight:300; border:none;"
+        )
+        self._text.setStyleSheet(
+            "color:#3a4565; font-size:13px; font-weight:600; border:none;"
+        )
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+            
+            from peliculaUI import MainWindow   # ← nombre de tu archivo .py
+            self.formulario = MainWindow()
+            self.formulario.show()
+            
+        super().mousePressEvent(event)
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  VENTANA PRINCIPAL DEL CATÁLOGO
+# ══════════════════════════════════════════════════════════════════════
+class CatalogoWindow(QWidget):
+    # Señal para abrir el formulario de edición (conectar desde afuera)
+    open_edit = pyqtSignal(object)
+
+    def __init__(self, usuario="usuario", parent=None):
+        super().__init__(parent)
+        self.usuario = usuario
+        self.setWindowTitle("CineLog — Catálogo")
+        self.setMinimumSize(900, 620)
+        self._setup_palette()
+        self._build_ui()
+        self._cargar_catalogo()
+
+    # ── Paleta oscura global ──────────────────────────────────────────
+    def _setup_palette(self):
+        self.setStyleSheet("background:#0d0f1a;")
+
+    # ── Layout principal ─────────────────────────────────────────────
+    def _build_ui(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(24, 20, 24, 20)
+        root.setSpacing(16)
+
+        # ── Header ────────────────────────────────────────────────────
+        header = QHBoxLayout()
+
+        welcome = QLabel()
+        welcome.setText(
+            f'<span style="color:#e8eaf0; font-size:22px; font-weight:700;">'
+            f'Welcome, </span>'
+            f'<span style="color:#00c8b4; font-size:22px; font-weight:700;">'
+            f'{self.usuario}</span>'
+        )
+        header.addWidget(welcome)
+        header.addStretch()
+
+        # Buscador
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("🔍  Search Movies...")
+        self.search_input.setFixedSize(240, 38)
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                background:#1e2130;
+                border: 1px solid #2a2f45;
+                border-radius: 19px;
+                padding: 0 16px;
+                color: #e8eaf0;
+                font-size: 13px;
+            }
+            QLineEdit:focus { border-color: #00c8b4; }
+        """)
+        self.search_input.textChanged.connect(self._on_search)
+        header.addWidget(self.search_input)
+
+        # Botón añadir
+        btn_add = QPushButton("＋ Añadir película")
+        btn_add.setFixedHeight(38)
+        btn_add.setStyleSheet("""
+            QPushButton {
+                background:#00c8b4; color:#0d0f1a;
+                border:none; border-radius:10px;
+                font-size:13px; font-weight:700;
+                padding: 0 18px;
+            }
+            QPushButton:hover { background:#00e5cf; }
+        """)
+        btn_add.clicked.connect(lambda: self.open_edit.emit(None))
+        header.addSpacing(10)
+        header.addWidget(btn_add)
+
+        root.addLayout(header)
+
+        # ── Contador ──────────────────────────────────────────────────
+        self.count_label = QLabel()
+        self.count_label.setStyleSheet("color:#6b7080; font-size:12px;")
+        root.addWidget(self.count_label)
+
+        # ── Grid de tarjetas (scroll) ─────────────────────────────────
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("""
+            QScrollArea { background: transparent; }
+            QScrollBar:vertical {
+                background:#1a1d2e; width:6px; border-radius:3px;
+            }
+            QScrollBar::handle:vertical {
+                background:#2a2f45; border-radius:3px;
+            }
+            QScrollBar::handle:vertical:hover { background:#00c8b4; }
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical { height:0; }
+        """)
+
+        self.grid_container = QWidget()
+        self.grid_container.setStyleSheet("background: transparent;")
+        self.grid_layout = QGridLayout(self.grid_container)
+        self.grid_layout.setSpacing(20)
+        self.grid_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll.setWidget(self.grid_container)
+        root.addWidget(scroll)
+
+        # ── Estado vacío ──────────────────────────────────────────────
+        self.empty_label = QLabel(
+            "No hay películas.\nUsa '＋ Añadir película' para comenzar."
+        )
+        self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_label.setStyleSheet(
+            "color:#3a4060; font-size:16px; line-height:1.8;"
+        )
+        self.empty_label.hide()
+        root.addWidget(self.empty_label)
+
+    # ── Carga / recarga del catálogo ──────────────────────────────────
+    def _cargar_catalogo(self, query=""):
+        peliculas = _search(query) if query else _get_all()
+        self._render_grid(peliculas)
+
+    def _render_grid(self, peliculas):
+        # Limpiar grid
+        while self.grid_layout.count():
+            item = self.grid_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        if not peliculas:
+            self.empty_label.hide()
+            self.count_label.setText("0 películas")
+            add_card = AddMovieCard()
+            add_card.clicked.connect(lambda: self.open_edit.emit(None))
+            self.grid_layout.addWidget(add_card, 0, 0)
+            return
+
+        self.empty_label.hide()
+        self.count_label.setText(
+            f"{len(peliculas)} película{'s' if len(peliculas) != 1 else ''}"
+        )
+
+        COLS = max(1, (self.width() - 48) // 240)
+        for i, peli in enumerate(peliculas):
+            card = MovieCard(peli)
+            card.explore_clicked.connect(self._show_detail)
+            self.grid_layout.addWidget(card, i // COLS, i % COLS)
+
+        # ── Tarjeta "+ Agregar" al final ──────────────────────────────
+        add_card = AddMovieCard()
+        add_card.clicked.connect(lambda: self.open_edit.emit(None))
+        next_pos = len(peliculas)
+        self.grid_layout.addWidget(add_card, next_pos // COLS, next_pos % COLS)
+
+        # Relleno vacío para alinear a la izquierda
+        total = len(peliculas) + 1          # +1 por la tarjeta de añadir
+        remainder = total % COLS
+        if remainder:
+            for j in range(COLS - remainder):
+                spacer = QWidget()
+                spacer.setFixedSize(220, 280)
+                spacer.setStyleSheet("background:transparent;")
+                self.grid_layout.addWidget(
+                    spacer, total // COLS, remainder + j
+                )
+
+    # ── Búsqueda en tiempo real ───────────────────────────────────────
+    def _on_search(self, text):
+        self._cargar_catalogo(text.strip())
+
+    # ── Detalle de película ───────────────────────────────────────────
+    def _show_detail(self, pelicula):
+        dlg = DetailDialog(pelicula, self)
+        dlg.request_edit.connect(self.open_edit.emit)
+        dlg.request_delete.connect(self._confirmar_eliminar)
+        # Centrar sobre la ventana principal
+        geo = self.geometry()
+        dlg.move(
+            geo.x() + (geo.width()  - dlg.width())  // 2,
+            geo.y() + (geo.height() - dlg.height()) // 2,
+        )
+        dlg.show()
+
+    # ── Eliminar película ─────────────────────────────────────────────
+    def _confirmar_eliminar(self, pelicula):
+        r = QMessageBox.question(
+            self, "Eliminar",
+            f"¿Eliminar «{pelicula.titulo}»?\nTambién se borrarán sus reseñas.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if r == QMessageBox.StandardButton.Yes:
+            _del(pelicula)
+            self.refresh()
+
+    # ── API pública ───────────────────────────────────────────────────
+    def refresh(self):
+        """Llama esto después de agregar/editar una película."""
+        self._cargar_catalogo(self.search_input.text().strip())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Re-renderizar el grid al redimensionar la ventana
+        self._cargar_catalogo(self.search_input.text().strip())
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  PUNTO DE ENTRADA STANDALONE (prueba sin el formulario)
+# ══════════════════════════════════════════════════════════════════════
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+
+    # Inyectar datos de demo si el JSON está vacío
+    try:
+        from Json import JsonManager
+        db = JsonManager()
+        if not db.obtener_peliculas():
+            demos = [
+                ("Inception",      "Un ladrón que roba secretos en sueños.",  None, "2010-07-16", 2010, "Christopher Nolan"),
+                ("The Matrix",     "Un hacker descubre la verdad del mundo.", None, "1999-03-31", 1999, "Wachowski Sisters"),
+                ("Dune",           "La épica batalla por el planeta Arrakis.", None, "2021-10-22", 2021, "Denis Villeneuve"),
+                ("Interstellar",   "Viaje a través de un agujero de gusano.", None, "2014-11-07", 2014, "Christopher Nolan"),
+                ("Blade Runner 2049","Un blade runner descubre un secreto.",  None, "2017-10-06", 2017, "Denis Villeneuve"),
+                ("The Wars",       "Una guerra épica intergaláctica.",        None, "2023-05-01", 2023, "Anon"),
+            ]
+            for t, d, img, f, a, dir_ in demos:
+                db.agregar_pelicula(t, d, img, f, a, dir_)
+    except Exception as e:
+        print(f"Demo data skipped: {e}")
+
+    win = CatalogoWindow(usuario="pablo_99")
+    win.open_edit.connect(lambda p: print(
+        f"Abrir formulario para editar: {p.titulo if p else 'nueva película'}"
+    ))
+    win.show()
+    sys.exit(app.exec())
