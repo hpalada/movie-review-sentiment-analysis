@@ -3,6 +3,7 @@ from tkinter              import messagebox
 from ClaseLogin           import ClaseLogin
 from FormRegistroUsuario  import FormCrearUsuario
 from FormCambiarContra    import FormCambioPass
+from catalogoPrincipal import CatalogoWindow
 
 BG       = "#0d0d1a"
 PANEL    = "#12122a"
@@ -109,19 +110,48 @@ class FormLogin:
             self.lbl_status.config(text=f"✗  {error}", fg=ERROR)
             return
 
-        # FIX: usuario es dict, se accede con ["nombre_usuario"] no .nombre_usuario
         nombre = usuario["nombre_usuario"]
         self.lbl_status.config(
-            text=f"✓  ¡Bienvenido, {nombre}! · Correo enviado 📧", fg=SUCCESS)
+            text=f"✓  ¡Bienvenido, {nombre}!", fg=SUCCESS)
 
-        info = f"¡Hola, {nombre}!\nHas iniciado sesión correctamente."
+        # ── Aviso opcional (contraseña próxima a vencer, etc.) ────────
         if aviso:
-            info += f"\n\n⚠ {aviso}"
+            messagebox.showwarning("Aviso", aviso, parent=self.root)
 
-        messagebox.showinfo("Sesión iniciada", info)
-        self.e_email.delete(0, tk.END)
-        self.e_pass.delete(0, tk.END)
-        self.lbl_status.config(text="")
+        # ── Mapear rol del dict de usuario al formato que espera el catálogo
+        # Ajusta la clave según lo que devuelva tu ClaseLogin:
+        #   "admin", "administrador" → "admin"
+        #   cualquier otro valor      → "lector"
+        rol_raw = str(usuario.get("rol", "lector")).lower().strip()
+        rol     = "admin" if rol_raw in ("admin", "administrador") else "lector"
+
+        # ── Abrir catálogo y cerrar login ─────────────────────────────
+        self.root.after(600, lambda: self._abrir_catalogo(nombre, rol))
+
+    def _abrir_catalogo(self, nombre: str, rol: str):
+        """Destruye la ventana Tk del login y lanza CatalogoWindow (PyQt6)."""
+
+        # Cerramos el loop de tkinter limpiamente
+        self.root.destroy()
+
+        # Arrancamos la app PyQt6 (si aún no existe una instancia activa)
+        from PyQt6.QtWidgets import QApplication
+        import sys
+
+        app = QApplication.instance() or QApplication(sys.argv)
+        app.setStyle("Fusion")
+
+        
+        self._catalogo = CatalogoWindow(usuario=nombre, rol=rol)
+        self._catalogo.show()
+
+        # Si este módulo es el punto de entrada ejecutamos el event-loop
+        if __name__ == "__main__":
+            sys.exit(app.exec())
+        else:
+            # Si lo lanzó otro módulo, solo ejecutamos el loop sin sys.exit
+            app.exec()
+
 
 if __name__ == "__main__":
     FormLogin()
