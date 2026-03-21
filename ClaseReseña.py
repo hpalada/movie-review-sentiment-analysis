@@ -1,3 +1,4 @@
+# ClaseReseña.py
 import re
 from ComunicacionModelo import ComunicacionModelo
 from Json import JsonManager

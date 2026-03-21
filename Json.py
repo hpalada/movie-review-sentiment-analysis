@@ -1,3 +1,4 @@
+#json.py
 import json
 import os
 from datetime import datetime
@@ -44,7 +45,9 @@ class JsonManager:
     # ─────────────────────────────────────────
 
     def obtener_usuarios(self):
+
         return self._cargar(self.archivo_usuarios)["usuarios"]
+    
 
     def obtener_usuario_por_id(self, usuario_id):
         return next(

@@ -187,7 +187,7 @@ class FormAgregaryEditar(QWidget):
         self.campo_resena.setReadOnly(True)
         self.lbl_valoracion.setText("Analizando...")
         self._limpiar_etiquetas()
-
+        
         datos = {
             "es_edicion"     : self.es_edicion,
             "usuario_id"     : self.usuario_id,

@@ -1,3 +1,4 @@
+#formLogin.py
 import tkinter as tk
 from tkinter              import messagebox
 from ClaseLogin           import ClaseLogin
@@ -114,42 +115,32 @@ class FormLogin:
         self.lbl_status.config(
             text=f"✓  ¡Bienvenido, {nombre}!", fg=SUCCESS)
 
-        # ── Aviso opcional (contraseña próxima a vencer, etc.) ────────
         if aviso:
             messagebox.showwarning("Aviso", aviso, parent=self.root)
 
-        # ── Mapear rol del dict de usuario al formato que espera el catálogo
-        # Ajusta la clave según lo que devuelva tu ClaseLogin:
-        #   "admin", "administrador" → "admin"
-        #   cualquier otro valor      → "lector"
         rol_raw = str(usuario.get("rol", "lector")).lower().strip()
         rol     = "admin" if rol_raw in ("admin", "administrador") else "lector"
 
-        # ── Abrir catálogo y cerrar login ─────────────────────────────
-        self.root.after(600, lambda: self._abrir_catalogo(nombre, rol))
+        # Pasamos el dict completo del usuario (incluye id, nombre_usuario, rol)
+        self.root.after(600, lambda: self._abrir_catalogo(usuario, rol))
 
-    def _abrir_catalogo(self, nombre: str, rol: str):
+    def _abrir_catalogo(self, usuario: dict, rol: str):
         """Destruye la ventana Tk del login y lanza CatalogoWindow (PyQt6)."""
 
-        # Cerramos el loop de tkinter limpiamente
         self.root.destroy()
 
-        # Arrancamos la app PyQt6 (si aún no existe una instancia activa)
         from PyQt6.QtWidgets import QApplication
         import sys
 
         app = QApplication.instance() or QApplication(sys.argv)
         app.setStyle("Fusion")
 
-        
-        self._catalogo = CatalogoWindow(usuario=nombre, rol=rol)
+        self._catalogo = CatalogoWindow(usuario=usuario, rol=rol)
         self._catalogo.show()
 
-        # Si este módulo es el punto de entrada ejecutamos el event-loop
         if __name__ == "__main__":
             sys.exit(app.exec())
         else:
-            # Si lo lanzó otro módulo, solo ejecutamos el loop sin sys.exit
             app.exec()
 
 

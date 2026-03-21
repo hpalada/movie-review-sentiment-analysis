@@ -14,6 +14,8 @@ if __name__ == "__main__":
     # Tomamos el primer usuario y la primera película del JSON
     usuario  = jm.obtener_usuarios()[0]
     pelicula = jm.obtener_peliculas()[0]
+    print("USUARIO:", usuario)
+    print("PELÍCULA:", pelicula)
 
     form = FormResenas(
         pelicula_id     = pelicula["id"],

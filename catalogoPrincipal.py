@@ -1,3 +1,4 @@
+#catalogoPrincipal.py
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QScrollArea, QFrame, QGridLayout, QSizePolicy,
@@ -161,7 +162,6 @@ class MovieCard(QFrame):
 class DetailDialog(QWidget):
     request_edit    = pyqtSignal(object)
     request_delete  = pyqtSignal(object)
-    # Señal para abrir reseñas con transición
     request_reviews = pyqtSignal(object)
 
     def __init__(self, pelicula, parent=None):
@@ -188,7 +188,6 @@ class DetailDialog(QWidget):
         layout.setContentsMargins(0, 0, 0, 20)
         layout.setSpacing(0)
 
-        # Imagen grande (clicable)
         img = QLabel()
         img.setFixedSize(460, 240)
         img.setScaledContents(True)
@@ -210,22 +209,18 @@ class DetailDialog(QWidget):
                 "background:#12141f; color:#2a2f45; font-size:60px; font-weight:900;"
             )
 
-        # Clic en imagen → abrir reseñas
         img.mousePressEvent = lambda e: (
             (self.request_reviews.emit(self.pelicula), self.close())
             if e.button() == Qt.MouseButton.LeftButton else None
         )
         layout.addWidget(img)
 
-        # Contenido
         content = QVBoxLayout()
         content.setContentsMargins(24, 16, 24, 0)
         content.setSpacing(8)
 
         titulo = QLabel(self.pelicula.titulo or "Sin título")
-        titulo.setStyleSheet(
-            "color:#e8eaf0; font-size:22px; font-weight:800;"
-        )
+        titulo.setStyleSheet("color:#e8eaf0; font-size:22px; font-weight:800;")
         content.addWidget(titulo)
 
         metas = []
@@ -243,16 +238,14 @@ class DetailDialog(QWidget):
         if getattr(self.pelicula, "descripcion", None):
             desc = QLabel(self.pelicula.descripcion)
             desc.setWordWrap(True)
-            desc.setStyleSheet("color:#9097b0; font-size:13px; line-height:1.5;")
+            desc.setStyleSheet("color:#9097b0; font-size:13px;")
             content.addWidget(desc)
 
         content.addStretch()
 
-        # Botones
         btns = QHBoxLayout()
         btns.setSpacing(10)
 
-        # Botón "Explore & Review" en el detalle también usa la señal
         btn_review = QPushButton("⭐  Explore & Review")
         btn_review.setFixedHeight(36)
         btn_review.setStyleSheet("""
@@ -346,40 +339,27 @@ class AddMovieCard(QFrame):
 
         icon = QLabel("＋")
         icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon.setStyleSheet(
-            "color:#2a2f45; font-size:52px; font-weight:300; border:none;"
-        )
+        icon.setStyleSheet("color:#2a2f45; font-size:52px; font-weight:300; border:none;")
         icon.setObjectName("AddIcon")
 
         text = QLabel("Agregar película")
         text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        text.setStyleSheet(
-            "color:#3a4565; font-size:13px; font-weight:600; border:none;"
-        )
+        text.setStyleSheet("color:#3a4565; font-size:13px; font-weight:600; border:none;")
         text.setObjectName("AddText")
 
         layout.addWidget(icon)
         layout.addWidget(text)
-
         self._icon = icon
         self._text = text
 
     def enterEvent(self, event):
-        self._icon.setStyleSheet(
-            "color:#00c8b4; font-size:52px; font-weight:300; border:none;"
-        )
-        self._text.setStyleSheet(
-            "color:#00c8b4; font-size:13px; font-weight:600; border:none;"
-        )
+        self._icon.setStyleSheet("color:#00c8b4; font-size:52px; font-weight:300; border:none;")
+        self._text.setStyleSheet("color:#00c8b4; font-size:13px; font-weight:600; border:none;")
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        self._icon.setStyleSheet(
-            "color:#2a2f45; font-size:52px; font-weight:300; border:none;"
-        )
-        self._text.setStyleSheet(
-            "color:#3a4565; font-size:13px; font-weight:600; border:none;"
-        )
+        self._icon.setStyleSheet("color:#2a2f45; font-size:52px; font-weight:300; border:none;")
+        self._text.setStyleSheet("color:#3a4565; font-size:13px; font-weight:600; border:none;")
         super().leaveEvent(event)
 
     def mousePressEvent(self, event):
@@ -389,11 +369,9 @@ class AddMovieCard(QFrame):
 
 
 # ══════════════════════════════════════════════════════════════════════
-#  BADGE DE USUARIO (esquina superior)
+#  BADGE DE USUARIO
 # ══════════════════════════════════════════════════════════════════════
 class UserBadge(QFrame):
-    """Muestra ícono de usuario + nombre + rol en la esquina del header."""
-
     def __init__(self, nombre: str, rol: str, parent=None):
         super().__init__(parent)
         self.setObjectName("UserBadge")
@@ -409,7 +387,6 @@ class UserBadge(QFrame):
         layout.setContentsMargins(10, 6, 14, 6)
         layout.setSpacing(8)
 
-        # Círculo con inicial del usuario
         avatar = QLabel(nombre[0].upper() if nombre else "?")
         avatar.setFixedSize(30, 30)
         avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -422,7 +399,6 @@ class UserBadge(QFrame):
             font-weight: 800;
         """)
 
-        # Nombre y rol
         info = QVBoxLayout()
         info.setSpacing(0)
         info.setContentsMargins(0, 0, 0, 0)
@@ -443,7 +419,6 @@ class UserBadge(QFrame):
 
         info.addWidget(lbl_nombre)
         info.addWidget(lbl_rol)
-
         layout.addWidget(avatar)
         layout.addLayout(info)
 
@@ -455,35 +430,43 @@ class CatalogoWindow(QWidget):
     """
     Parámetros
     ----------
-    usuario : str
-        Nombre del usuario que inició sesión.
+    usuario : str | dict
+        Acepta un string simple ("pablo_99") O el dict completo que
+        devuelve ClaseLogin:
+            { "nombre_usuario": str, "id": int, "rol": str, ... }
     rol : str
-        "admin"  → puede agregar / editar / eliminar películas.
-        "lector" → solo puede explorar y reseñar.
-    parent : QWidget, opcional
+        "admin" o "lector".  Se ignora si usuario es dict y ya tiene "rol".
     """
 
-    # Señal para abrir formulario de edición (conectar desde afuera)
-    open_edit = pyqtSignal(object)
-    # Señal para navegar a reseñas con transición suave
+    open_edit    = pyqtSignal(object)
     open_reviews = pyqtSignal(object)
 
-    def __init__(self, usuario: str = "usuario", rol: str = "lector",
-                 parent=None):
+    def __init__(self, usuario="usuario", rol: str = "lector", parent=None):
         super().__init__(parent)
-        self.usuario = usuario
-        self.rol     = rol.lower().strip()   # "admin" o "lector"
+
+        # ── Normalizar usuario (str o dict) ───────────────────────────
+        if isinstance(usuario, dict):
+            self.usuario_dict = usuario
+            self.usuario      = usuario.get("nombre_usuario", "usuario")
+            rol_raw           = str(usuario.get("rol", rol)).lower().strip()
+        else:
+            self.usuario_dict = {"nombre_usuario": usuario, "id": None, "rol": rol}
+            self.usuario      = usuario
+            rol_raw           = str(rol).lower().strip()
+
+        self.rol        = "admin" if rol_raw in ("admin", "administrador") else "lector"
+        # ID numérico del usuario activo → FormResenas lo necesita
+        self.usuario_id = self.usuario_dict.get("id") or 0
+
         self.setWindowTitle("CineLog — Catálogo")
         self.setMinimumSize(900, 620)
         self._setup_palette()
         self._build_ui()
         self._cargar_catalogo()
 
-    # ── Paleta oscura global ──────────────────────────────────────────
     def _setup_palette(self):
         self.setStyleSheet("background:#0d0f1a;")
 
-    # ── Layout principal ─────────────────────────────────────────────
     def _build_ui(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
@@ -494,15 +477,12 @@ class CatalogoWindow(QWidget):
 
         welcome = QLabel()
         welcome.setText(
-            f'<span style="color:#e8eaf0; font-size:22px; font-weight:700;">'
-            f'CineLog — </span>'
-            f'<span style="color:#00c8b4; font-size:22px; font-weight:700;">'
-            f'Catálogo</span>'
+            f'<span style="color:#e8eaf0; font-size:22px; font-weight:700;">CineLog — </span>'
+            f'<span style="color:#00c8b4; font-size:22px; font-weight:700;">Catálogo</span>'
         )
         header.addWidget(welcome)
         header.addStretch()
 
-        # Buscador
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("🔍  Search Movies...")
         self.search_input.setFixedSize(240, 38)
@@ -520,7 +500,6 @@ class CatalogoWindow(QWidget):
         self.search_input.textChanged.connect(self._on_search)
         header.addWidget(self.search_input)
 
-        # Botón añadir  (solo admin)
         if self.rol == "admin":
             btn_add = QPushButton("＋ Añadir película")
             btn_add.setFixedHeight(38)
@@ -537,24 +516,20 @@ class CatalogoWindow(QWidget):
             header.addSpacing(10)
             header.addWidget(btn_add)
 
-        # Badge de usuario (siempre visible, en el extremo derecho)
         header.addSpacing(12)
         badge = UserBadge(self.usuario, self.rol)
         header.addWidget(badge)
 
         root.addLayout(header)
 
-        # ── Contador ──────────────────────────────────────────────────
         self.count_label = QLabel()
         self.count_label.setStyleSheet("color:#6b7080; font-size:12px;")
         root.addWidget(self.count_label)
 
-        # ── Grid de tarjetas (scroll) ─────────────────────────────────
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setStyleSheet("""
             QScrollArea { background: transparent; }
             QScrollBar:vertical {
@@ -577,18 +552,13 @@ class CatalogoWindow(QWidget):
         scroll.setWidget(self.grid_container)
         root.addWidget(scroll)
 
-        # ── Estado vacío ──────────────────────────────────────────────
-        self.empty_label = QLabel(
-            "No hay películas.\nUsa '＋ Añadir película' para comenzar."
-        )
+        self.empty_label = QLabel("No hay películas.\nUsa '＋ Añadir película' para comenzar.")
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty_label.setStyleSheet(
-            "color:#3a4060; font-size:16px; line-height:1.8;"
-        )
+        self.empty_label.setStyleSheet("color:#3a4060; font-size:16px;")
         self.empty_label.hide()
         root.addWidget(self.empty_label)
 
-    # ── Carga / recarga del catálogo ──────────────────────────────────
+    # ── Carga del grid ────────────────────────────────────────────────
     def _cargar_catalogo(self, query=""):
         peliculas = _search(query) if query else _get_all()
         self._render_grid(peliculas)
@@ -616,19 +586,15 @@ class CatalogoWindow(QWidget):
         COLS = max(1, (self.width() - 48) // 240)
         for i, peli in enumerate(peliculas):
             card = MovieCard(peli)
-            # Tanto imagen como botón ahora emiten explore_clicked →
-            # aquí lo enrutamos a _navigate_to_reviews para la transición
+            # imagen Y botón emiten explore_clicked → va a _navigate_to_reviews
             card.explore_clicked.connect(self._navigate_to_reviews)
             self.grid_layout.addWidget(card, i // COLS, i % COLS)
 
-        # Tarjeta "+" solo para admin
         if self.rol == "admin":
             add_card = AddMovieCard()
             add_card.clicked.connect(lambda: self.open_edit.emit(None))
-            next_pos = len(peliculas)
-            self.grid_layout.addWidget(
-                add_card, next_pos // COLS, next_pos % COLS
-            )
+            next_pos  = len(peliculas)
+            self.grid_layout.addWidget(add_card, next_pos // COLS, next_pos % COLS)
             total     = len(peliculas) + 1
             remainder = total % COLS
             if remainder:
@@ -636,11 +602,8 @@ class CatalogoWindow(QWidget):
                     spacer = QWidget()
                     spacer.setFixedSize(220, 280)
                     spacer.setStyleSheet("background:transparent;")
-                    self.grid_layout.addWidget(
-                        spacer, total // COLS, remainder + j
-                    )
+                    self.grid_layout.addWidget(spacer, total // COLS, remainder + j)
         else:
-            # Relleno sin la tarjeta de añadir
             remainder = len(peliculas) % COLS
             if remainder:
                 for j in range(COLS - remainder):
@@ -648,14 +611,11 @@ class CatalogoWindow(QWidget):
                     spacer.setFixedSize(220, 280)
                     spacer.setStyleSheet("background:transparent;")
                     self.grid_layout.addWidget(
-                        spacer, len(peliculas) // COLS, remainder + j
-                    )
+                        spacer, len(peliculas) // COLS, remainder + j)
 
-    # ── Búsqueda en tiempo real ───────────────────────────────────────
     def _on_search(self, text):
         self._cargar_catalogo(text.strip())
 
-    # ── Detalle de película ───────────────────────────────────────────
     def _show_detail(self, pelicula):
         dlg = DetailDialog(pelicula, self)
         dlg.request_edit.connect(self.open_edit.emit)
@@ -668,89 +628,46 @@ class CatalogoWindow(QWidget):
         )
         dlg.show()
 
-    # ── Navegación hacia FormReseñas con transición ───────────────────
+    # ══════════════════════════════════════════════════════════════════
+    #  NAVEGACIÓN → FormResenas  (ventana independiente)
+    # ══════════════════════════════════════════════════════════════════
+
     def _navigate_to_reviews(self, pelicula):
-        """
-        Hace un fade-out de esta ventana y luego abre FormReseñas
-        con un fade-in, sin cerrar primero y abrir después (sin flash).
-        Cuando FormReseñas se cierre, esta ventana hace fade-in de vuelta.
-        """
-        # Emitimos la señal por si el padre quiere interceptar
+        """Abre FormResenas como ventana independiente sin tocar el catálogo."""
         self.open_reviews.emit(pelicula)
 
-        # ── Fade-out del catálogo ─────────────────────────────────────
-        self._opacity_effect = QGraphicsOpacityEffect(self)
-        self.setGraphicsEffect(self._opacity_effect)
+        pelicula_id     = getattr(pelicula, "id",     None)
+        titulo_pelicula = getattr(pelicula, "titulo", "Sin título")
 
-        self._anim_out = QPropertyAnimation(self._opacity_effect, b"opacity")
-        self._anim_out.setDuration(220)
-        self._anim_out.setStartValue(1.0)
-        self._anim_out.setEndValue(0.0)
-        self._anim_out.setEasingCurve(QEasingCurve.Type.InQuad)
-
-        def _after_fadeout():
-            self.hide()
-            self.setGraphicsEffect(None)   # limpiar efecto
-            self._open_form_resenas(pelicula)
-
-        self._anim_out.finished.connect(_after_fadeout)
-        self._anim_out.start()
-
-    def _open_form_resenas(self, pelicula):
-        """Instancia FormReseñas, hace fade-in, y conecta el regreso."""
         try:
-            from FormReseñas import FormReseñas
-            self._form_resenas = FormReseñas(
-                pelicula=pelicula,
-                usuario=self.usuario,
-                rol=self.rol
+            from FormReseñas import FormResenas
+            
+            form = FormResenas(
+                pelicula_id     = pelicula_id,
+                usuario_id      = self.usuario_id,   # ← agregar esta línea
+                clase_pelicula  = None,
+                clase_resena    = None,
+                titulo_pelicula = titulo_pelicula,
+                pelicula_obj    = pelicula,
             )
         except ImportError:
-            # Placeholder si FormReseñas.py aún no existe
-            self._form_resenas = _PlaceholderReviews(pelicula, self.usuario)
+            form = _PlaceholderReviews(pelicula, self.usuario)
 
-        # ── Fade-in de FormReseñas ────────────────────────────────────
-        fx = QGraphicsOpacityEffect(self._form_resenas)
-        self._form_resenas.setGraphicsEffect(fx)
+        # Guardar referencia para que Python no destruya la ventana al salir
+        # del scope — sin esto la ventana parpadea y desaparece inmediatamente
+        if not hasattr(self, "_ventanas_resenas"):
+            self._ventanas_resenas = []
+        self._ventanas_resenas.append(form)
 
-        anim_in = QPropertyAnimation(fx, b"opacity")
-        anim_in.setDuration(260)
-        anim_in.setStartValue(0.0)
-        anim_in.setEndValue(1.0)
-        anim_in.setEasingCurve(QEasingCurve.Type.OutQuad)
+        # Cuando se cierre, limpiar la referencia de la lista
+        form.destroyed.connect(
+            lambda obj=form: self._ventanas_resenas.remove(obj)
+            if obj in self._ventanas_resenas else None
+        )
 
-        def _after_fadein():
-            self._form_resenas.setGraphicsEffect(None)
-
-        anim_in.finished.connect(_after_fadein)
-
-        # Tamaño y posición iguales a la ventana del catálogo
-        geo = self.geometry()
-        self._form_resenas.setGeometry(geo)
-        self._form_resenas.show()
-        anim_in.start()
-
-        # Cuando FormReseñas se cierra → volvemos al catálogo con fade-in
-        self._form_resenas.destroyed.connect(self._return_to_catalog)
-        # Si FormReseñas emite una señal "cerrar" también la conectamos
-        if hasattr(self._form_resenas, "closed"):
-            self._form_resenas.closed.connect(self._return_to_catalog)
-
-    def _return_to_catalog(self):
-        """Regresa al catálogo con fade-in suave."""
-        self.refresh()
-        self.show()
-
-        fx = QGraphicsOpacityEffect(self)
-        self.setGraphicsEffect(fx)
-
-        anim = QPropertyAnimation(fx, b"opacity")
-        anim.setDuration(260)
-        anim.setStartValue(0.0)
-        anim.setEndValue(1.0)
-        anim.setEasingCurve(QEasingCurve.Type.OutQuad)
-        anim.finished.connect(lambda: self.setGraphicsEffect(None))
-        anim.start()
+        form.show()
+        form.raise_()
+        form.activateWindow()
 
     # ── Eliminar película ─────────────────────────────────────────────
     def _confirmar_eliminar(self, pelicula):
@@ -765,7 +682,6 @@ class CatalogoWindow(QWidget):
 
     # ── API pública ───────────────────────────────────────────────────
     def refresh(self):
-        """Llama esto después de agregar/editar una película."""
         self._cargar_catalogo(self.search_input.text().strip())
 
     def resizeEvent(self, event):
@@ -774,10 +690,9 @@ class CatalogoWindow(QWidget):
 
 
 # ══════════════════════════════════════════════════════════════════════
-#  PLACEHOLDER — sustituye FormReseñas si el archivo aún no existe
+#  PLACEHOLDER  (mientras FormResenas.py no exista)
 # ══════════════════════════════════════════════════════════════════════
 class _PlaceholderReviews(QWidget):
-    """Ventana temporal hasta que FormReseñas.py esté disponible."""
     closed = pyqtSignal()
 
     def __init__(self, pelicula, usuario, parent=None):
@@ -794,8 +709,7 @@ class _PlaceholderReviews(QWidget):
             f'<span style="color:#00c8b4; font-size:28px; font-weight:800;">'
             f'{pelicula.titulo}</span><br>'
             f'<span style="color:#6b7080; font-size:14px;">'
-            f'FormReseñas.py aún no está disponible.<br>'
-            f'Conecta aquí tu formulario de reseñas.</span>'
+            f'FormResenas.py aún no está disponible.</span>'
             f'</div>'
         )
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -823,26 +737,22 @@ class _PlaceholderReviews(QWidget):
 #  PUNTO DE ENTRADA STANDALONE
 # ══════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
-    import sys
-
-    # Lee rol desde argv:  python catalogoUI.py pablo_99 admin
     usuario = sys.argv[1] if len(sys.argv) > 1 else "pablo_99"
     rol     = sys.argv[2] if len(sys.argv) > 2 else "lector"
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
 
-    # Inyectar datos de demo si el JSON está vacío
     try:
         from Json import JsonManager
         db = JsonManager()
         if not db.obtener_peliculas():
             demos = [
-                ("Inception",        "Un ladrón que roba secretos en sueños.",    None, "2010-07-16", 2010, "Christopher Nolan"),
-                ("The Matrix",       "Un hacker descubre la verdad del mundo.",    None, "1999-03-31", 1999, "Wachowski Sisters"),
-                ("Dune",             "La épica batalla por el planeta Arrakis.",   None, "2021-10-22", 2021, "Denis Villeneuve"),
-                ("Interstellar",     "Viaje a través de un agujero de gusano.",    None, "2014-11-07", 2014, "Christopher Nolan"),
-                ("Blade Runner 2049","Un blade runner descubre un secreto.",       None, "2017-10-06", 2017, "Denis Villeneuve"),
+                ("Inception",         "Un ladrón que roba secretos en sueños.",   None, "2010-07-16", 2010, "Christopher Nolan"),
+                ("The Matrix",        "Un hacker descubre la verdad del mundo.",   None, "1999-03-31", 1999, "Wachowski Sisters"),
+                ("Dune",              "La épica batalla por el planeta Arrakis.",  None, "2021-10-22", 2021, "Denis Villeneuve"),
+                ("Interstellar",      "Viaje a través de un agujero de gusano.",   None, "2014-11-07", 2014, "Christopher Nolan"),
+                ("Blade Runner 2049", "Un blade runner descubre un secreto.",      None, "2017-10-06", 2017, "Denis Villeneuve"),
             ]
             for t, d, img, f, a, dir_ in demos:
                 db.agregar_pelicula(t, d, img, f, a, dir_)
@@ -853,8 +763,6 @@ if __name__ == "__main__":
     win.open_edit.connect(lambda p: print(
         f"[open_edit] {'nueva película' if not p else p.titulo}"
     ))
-    win.open_reviews.connect(lambda p: print(
-        f"[open_reviews] {p.titulo}"
-    ))
+    win.open_reviews.connect(lambda p: print(f"[open_reviews] {p.titulo}"))
     win.show()
     sys.exit(app.exec())

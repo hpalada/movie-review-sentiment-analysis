@@ -1,20 +1,22 @@
+# FormReseñas.py
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QScrollArea, QPushButton, QFrame, QSizePolicy
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
-
+from ClaseReseña import Resena
 
 class FormResenas(QWidget):
-    def __init__(self, pelicula_id: int, usuario_id: int, clase_pelicula,
-                 clase_resena, titulo_pelicula: str = ""):
+    def __init__(self, pelicula_id, usuario_id, clase_pelicula,
+             clase_resena=None, titulo_pelicula="", pelicula_obj=None):
         super().__init__()
         self.pelicula_id     = pelicula_id
         self.usuario_id      = usuario_id
         self.clase_pelicula  = clase_pelicula
-        self.clase_resena    = clase_resena
+        self.clase_resena = Resena()
         self.titulo_pelicula = titulo_pelicula
+        self.pelicula_obj    = pelicula_obj  # objeto completo recibido desde el catálogo
 
         self.setWindowTitle("Reseñas")
         self.resize(1100, 750)
@@ -99,7 +101,25 @@ class FormResenas(QWidget):
         self._cargar_resenas()
 
     def _cargar_info_pelicula(self):
-        # Si no hay capa intermedia aún, usamos el título que llegó por parámetro
+        # Si hay un objeto pelicula directo (venimos desde el catálogo), lo usamos
+        if self.pelicula_obj and not self.clase_pelicula:
+            p = self.pelicula_obj
+            self.lbl_nombre.setText(getattr(p, "titulo", self.titulo_pelicula) or "Sin título")
+
+            import os
+            from PyQt6.QtGui import QPixmap
+            ruta_poster = getattr(p, "imagen", None)
+            if ruta_poster and os.path.exists(ruta_poster):
+                pixmap = QPixmap(ruta_poster)
+                if not pixmap.isNull():
+                    self.lbl_poster.setPixmap(
+                        pixmap.scaled(190, 270,
+                                      Qt.AspectRatioMode.KeepAspectRatio,
+                                      Qt.TransformationMode.SmoothTransformation)
+                    )
+            return
+
+        # Fallback: sin capa intermedia, solo mostrar el título recibido
         if not self.clase_pelicula:
             self.lbl_nombre.setText(self.titulo_pelicula or "Sin título")
             return
@@ -126,6 +146,12 @@ class FormResenas(QWidget):
             item = self.layout_resenas.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+
+        if not self.clase_resena:
+            lbl_vacio = QLabel("Aún no hay reseñas para esta película.")
+            lbl_vacio.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.layout_resenas.addWidget(lbl_vacio)
+            return
 
         resenas = self.clase_resena.obtener_resenas_pelicula(self.pelicula_id)
 
@@ -236,6 +262,7 @@ class FormResenas(QWidget):
             callback        = self._cargar_resenas
         )
         self.form_ae.show()
+
     def _eliminar_resena(self, resena: dict):
         from PyQt6.QtWidgets import QMessageBox
 
@@ -253,6 +280,6 @@ class FormResenas(QWidget):
             )
 
             if resultado["exito"]:
-                self._cargar_resenas()   # refresca las tarjetas
+                self._cargar_resenas()
             else:
                 QMessageBox.warning(self, "Error", resultado["mensaje"])
