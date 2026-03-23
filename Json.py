@@ -1,4 +1,4 @@
-#json.py
+# Json.py
 import json
 import os
 from datetime import datetime
@@ -45,9 +45,7 @@ class JsonManager:
     # ─────────────────────────────────────────
 
     def obtener_usuarios(self):
-
         return self._cargar(self.archivo_usuarios)["usuarios"]
-    
 
     def obtener_usuario_por_id(self, usuario_id):
         return next(
@@ -56,33 +54,54 @@ class JsonManager:
 
     def obtener_usuario_por_nombre(self, nombre_usuario):
         return next(
-            (u for u in self.obtener_usuarios() if u["nombre_usuario"] == nombre_usuario), None
+            (u for u in self.obtener_usuarios()
+             if u["nombre_usuario"] == nombre_usuario), None
         )
 
     def obtener_usuario_por_email(self, email):
-        """Busca un usuario por su correo electrónico."""
         return next(
             (u for u in self.obtener_usuarios()
              if u.get("email", "").lower() == email.strip().lower()), None
         )
 
-    def agregar_usuario(self, nombre_usuario, contrasena_hash, email=""):
+    def obtener_usuario_por_nombre_o_email(self, credencial):
+        """
+        Busca un usuario por nombre_usuario O por email.
+        Útil para el login donde el usuario puede ingresar cualquiera de los dos.
+        """
+        credencial = credencial.strip()
+        for u in self.obtener_usuarios():
+            if u["nombre_usuario"] == credencial:
+                return u
+            if u.get("email", "").lower() == credencial.lower():
+                return u
+        return None
+
+    def agregar_usuario(self, nombre_usuario, contrasena_hash,
+                        email="", rol="lector"):
+        """
+        Registra un nuevo usuario.
+        rol puede ser "admin" o "lector" (por defecto "lector").
+        """
         data = self._cargar(self.archivo_usuarios)
 
-        # Verificar nombre duplicado
         if any(u["nombre_usuario"] == nombre_usuario for u in data["usuarios"]):
             return None
 
-        # Verificar email duplicado
         if email and any(u.get("email", "").lower() == email.strip().lower()
                          for u in data["usuarios"]):
             return None
+
+        # Normalizar rol
+        rol_norm = "admin" if str(rol).lower().strip() in ("admin", "administrador") \
+                   else "lector"
 
         nuevo_usuario = {
             "id"             : self._generar_id(data["usuarios"]),
             "nombre_usuario" : nombre_usuario,
             "email"          : email.strip().lower(),
             "contrasena_hash": contrasena_hash,
+            "rol"            : rol_norm,          # ← campo nuevo
             "fecha_registro" : datetime.now().isoformat()
         }
 
@@ -91,11 +110,22 @@ class JsonManager:
         return nuevo_usuario
 
     def actualizar_contrasena(self, email, nueva_contrasena_hash):
-        """Actualiza la contraseña de un usuario buscado por email."""
         data = self._cargar(self.archivo_usuarios)
         for usuario in data["usuarios"]:
             if usuario.get("email", "").lower() == email.strip().lower():
                 usuario["contrasena_hash"] = nueva_contrasena_hash
+                self._guardar(self.archivo_usuarios, data)
+                return True
+        return False
+
+    def actualizar_rol(self, email, nuevo_rol):
+        """Cambia el rol de un usuario existente."""
+        rol_norm = "admin" if str(nuevo_rol).lower().strip() in \
+                   ("admin", "administrador") else "lector"
+        data = self._cargar(self.archivo_usuarios)
+        for usuario in data["usuarios"]:
+            if usuario.get("email", "").lower() == email.strip().lower():
+                usuario["rol"] = rol_norm
                 self._guardar(self.archivo_usuarios, data)
                 return True
         return False
@@ -162,7 +192,7 @@ class JsonManager:
         return None
 
     def eliminar_pelicula(self, pelicula_id):
-        data = self._cargar(self.archivo_peliculas)
+        data  = self._cargar(self.archivo_peliculas)
         antes = len(data["peliculas"])
         data["peliculas"] = [p for p in data["peliculas"] if p["id"] != pelicula_id]
 
@@ -217,20 +247,17 @@ class JsonManager:
             if resena["id"] == resena_id:
                 if resena["usuario_id"] != usuario_id:
                     return None
-
                 resena["texto"]              = nuevo_texto
                 resena["valoracion_ia"]      = nueva_valoracion_ia
                 resena["etiquetas_ia"]       = nuevas_etiquetas_ia
                 resena["fecha_modificacion"] = datetime.now().isoformat()
-
                 self._guardar(self.archivo_resenas, data)
                 return resena
 
         return None
 
     def eliminar_resena(self, resena_id, usuario_id):
-        data = self._cargar(self.archivo_resenas)
-
+        data  = self._cargar(self.archivo_resenas)
         resena = next((r for r in data["resenas"] if r["id"] == resena_id), None)
 
         if resena is None:
@@ -244,7 +271,8 @@ class JsonManager:
 
     def _eliminar_resenas_de_pelicula(self, pelicula_id):
         data = self._cargar(self.archivo_resenas)
-        data["resenas"] = [r for r in data["resenas"] if r["pelicula_id"] != pelicula_id]
+        data["resenas"] = [r for r in data["resenas"]
+                           if r["pelicula_id"] != pelicula_id]
         self._guardar(self.archivo_resenas, data)
 
     # ─────────────────────────────────────────
@@ -260,13 +288,14 @@ class JsonManager:
             datos_antiguos = json.load(f)
 
         peliculas_antiguas = datos_antiguos.get("peliculas", [])
-
         data_peliculas = self._cargar(self.archivo_peliculas)
         data_usuarios  = self._cargar(self.archivo_usuarios)
         data_resenas   = self._cargar(self.archivo_resenas)
 
-        if data_peliculas["peliculas"] or data_usuarios["usuarios"] or data_resenas["resenas"]:
-            print("⚠ Los archivos destino ya tienen datos. Migración cancelada para evitar duplicados.")
+        if data_peliculas["peliculas"] or data_usuarios["usuarios"] \
+                or data_resenas["resenas"]:
+            print("⚠ Los archivos destino ya tienen datos. "
+                  "Migración cancelada para evitar duplicados.")
             return False
 
         usuario_migrado = {
@@ -274,12 +303,12 @@ class JsonManager:
             "nombre_usuario" : "yo",
             "email"          : "",
             "contrasena_hash": "migrado_sin_hash",
+            "rol"            : "lector",
             "fecha_registro" : datetime.now().isoformat()
         }
         data_usuarios["usuarios"].append(usuario_migrado)
 
         id_resena = 1
-
         for pelicula in peliculas_antiguas:
             nueva_pelicula = {
                 "id"         : pelicula.get("id"),
@@ -298,8 +327,10 @@ class JsonManager:
                     "usuario_id"        : 1,
                     "pelicula_id"       : pelicula["id"],
                     "texto"             : resena_antigua.get("comentario", ""),
-                    "valoracion_ia"     : resena_antigua.get("analisis", {}).get("score", 0.0),
-                    "etiquetas_ia"      : [resena_antigua.get("analisis", {}).get("sentimiento", "neutral")],
+                    "valoracion_ia"     : resena_antigua.get(
+                        "analisis", {}).get("score", 0.0),
+                    "etiquetas_ia"      : [resena_antigua.get(
+                        "analisis", {}).get("sentimiento", "neutral")],
                     "fecha_creacion"    : datetime.now().isoformat(),
                     "fecha_modificacion": None
                 }

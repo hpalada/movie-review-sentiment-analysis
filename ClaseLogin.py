@@ -1,3 +1,4 @@
+# ClaseLogin.py
 import smtplib
 import ssl
 from email.mime.text      import MIMEText
@@ -5,7 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from datetime             import datetime
 
 from ClaseUsuario import ClaseUsuario
-from Json  import JsonManager          # FIX: era "from Json import JsonManager"
+from Json         import JsonManager
 
 EMAIL_SENDER   = os.environ.get("EMAIL_SENDER", "")
 EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
@@ -68,7 +69,7 @@ def _enviar_correo(destinatario, asunto, html, texto):
             server.sendmail(EMAIL_SENDER, destinatario, msg.as_string())
         return True, ""
     except smtplib.SMTPAuthenticationError:
-        return False, "Error de autenticación Gmail. Genera una nueva contraseña de aplicación."
+        return False, "Error de autenticación Gmail."
     except Exception:
         pass
 
@@ -82,11 +83,12 @@ def _enviar_correo(destinatario, asunto, html, texto):
             server.sendmail(EMAIL_SENDER, destinatario, msg.as_string())
         return True, ""
     except smtplib.SMTPAuthenticationError:
-        return False, "Error de autenticación Gmail. Genera una nueva contraseña de aplicación."
+        return False, "Error de autenticación Gmail."
     except Exception as e:
         return False, f"No se pudo conectar a Gmail: {e}"
 
-def _plantilla_registro(nombre_usuario, email):
+def _plantilla_registro(nombre_usuario, email, rol):
+    rol_display = "Administrador" if rol == "admin" else "Lector"
     asunto = "✦ ¡Bienvenido! Tu cuenta ha sido creada"
     cuerpo = f"""
         <p>Tu cuenta fue creada exitosamente con los siguientes datos:</p>
@@ -100,11 +102,16 @@ def _plantilla_registro(nombre_usuario, email):
             <td style="padding:10px;font-weight:bold;">Correo</td>
             <td style="padding:10px;">{email}</td>
           </tr>
+          <tr>
+            <td style="padding:10px;font-weight:bold;">Rol</td>
+            <td style="padding:10px;">{rol_display}</td>
+          </tr>
         </table>
-        <p>Ya puedes iniciar sesión con tu correo y contraseña.</p>
+        <p>Ya puedes iniciar sesión con tu correo o nombre de usuario.</p>
     """
     html  = _construir_html("✦ Cuenta Creada", nombre_usuario, cuerpo, "#4ade80")
-    texto = f"Hola {nombre_usuario},\n\nTu cuenta fue creada.\nCorreo: {email}\n\nYa puedes iniciar sesión."
+    texto = (f"Hola {nombre_usuario},\n\nTu cuenta fue creada.\n"
+             f"Correo: {email}\nRol: {rol_display}\n\nYa puedes iniciar sesión.")
     return asunto, html, texto
 
 def _plantilla_login(nombre_usuario, email):
@@ -127,7 +134,8 @@ def _plantilla_login(nombre_usuario, email):
            cambia tu contraseña de inmediato.</p>
     """
     html  = _construir_html("◈ Inicio de Sesión", nombre_usuario, cuerpo, "#6c63ff")
-    texto = f"Hola {nombre_usuario},\n\nInicio de sesión el {fecha}.\nSi no fuiste tú, cambia tu contraseña."
+    texto = (f"Hola {nombre_usuario},\n\nInicio de sesión el {fecha}.\n"
+             f"Si no fuiste tú, cambia tu contraseña.")
     return asunto, html, texto
 
 def _plantilla_cambio_pass(nombre_usuario, email):
@@ -150,8 +158,10 @@ def _plantilla_cambio_pass(nombre_usuario, email):
            contacta al administrador de inmediato.</p>
     """
     html  = _construir_html("⟳ Contraseña Actualizada", nombre_usuario, cuerpo, "#ff6b9d")
-    texto = f"Hola {nombre_usuario},\n\nContraseña cambiada el {fecha}.\nSi no fuiste tú, contacta al administrador."
+    texto = (f"Hola {nombre_usuario},\n\nContraseña cambiada el {fecha}.\n"
+             f"Si no fuiste tú, contacta al administrador.")
     return asunto, html, texto
+
 
 # =============================================================================
 #  CLASE LOGIN
@@ -159,8 +169,11 @@ def _plantilla_cambio_pass(nombre_usuario, email):
 class ClaseLogin:
 
     @staticmethod
-    def registrar(nombre_usuario, email, password, confirmar):
-        """Returns (ok, error, aviso_correo)"""
+    def registrar(nombre_usuario, email, password, confirmar, rol="lector"):
+        """
+        Returns (ok, error, aviso_correo)
+        rol: "admin" o "lector" (por defecto "lector")
+        """
         ok, msg = ClaseUsuario.validar_nombre(nombre_usuario)
         if not ok:
             return False, msg, ""
@@ -179,42 +192,58 @@ class ClaseLogin:
         if _db.obtener_usuario_por_email(email) is not None:
             return False, "Este correo ya está registrado.", ""
 
-        # FIX: JsonManager usa "contrasena_hash", no "password"
+        if _db.obtener_usuario_por_nombre(nombre_usuario) is not None:
+            return False, "Este nombre de usuario ya está registrado.", ""
+
+        rol_norm = "admin" if str(rol).lower().strip() in \
+                   ("admin", "administrador") else "lector"
+
         resultado = _db.agregar_usuario(
             nombre_usuario  = nombre_usuario.strip(),
             contrasena_hash = ClaseUsuario.hash_password(password),
-            email           = email.strip().lower()
+            email           = email.strip().lower(),
+            rol             = rol_norm
         )
         if resultado is None:
             return False, "No se pudo registrar el usuario.", ""
 
         asunto, html, texto = _plantilla_registro(
-            nombre_usuario.strip(), email.strip().lower())
+            nombre_usuario.strip(), email.strip().lower(), rol_norm)
         enviado, err = _enviar_correo(email.strip().lower(), asunto, html, texto)
         aviso = "" if enviado else f"Cuenta creada, pero el correo no se envió:\n{err}"
 
         return True, "", aviso
 
     @staticmethod
-    def autenticar(email, password):
-        """Returns (ok, error, usuario_dict|None, aviso_correo)"""
-        if not email or not password:
+    def autenticar(credencial, password):
+        """
+        Acepta nombre de usuario O correo electrónico como credencial.
+        Returns (ok, error, usuario_dict|None, aviso_correo)
+        """
+        if not credencial or not password:
             return False, "Completa todos los campos.", None, ""
 
-        usuario = _db.obtener_usuario_por_email(email)
+        # Buscar por nombre o email
+        usuario = _db.obtener_usuario_por_nombre_o_email(credencial)
         if usuario is None:
-            return False, "Correo no registrado.", None, ""
+            return False, "Usuario o correo no registrado.", None, ""
 
-        # FIX: JsonManager guarda "contrasena_hash", no "password"
         if usuario["contrasena_hash"] != ClaseUsuario.hash_password(password):
             return False, "Contraseña incorrecta.", None, ""
 
-        asunto, html, texto = _plantilla_login(
-            usuario["nombre_usuario"], usuario["email"])
-        enviado, err = _enviar_correo(usuario["email"], asunto, html, texto)
-        aviso = "" if enviado else f"Sesión iniciada, pero el correo no se envió:\n{err}"
+        # Asegurar que el dict tenga el campo rol (compatibilidad con datos antiguos)
+        if "rol" not in usuario:
+            usuario["rol"] = "lector"
 
-        # Devolvemos el dict directamente (no objeto ClaseUsuario)
+        email = usuario.get("email", "")
+        if email:
+            asunto, html, texto = _plantilla_login(
+                usuario["nombre_usuario"], email)
+            enviado, err = _enviar_correo(email, asunto, html, texto)
+            aviso = "" if enviado else f"Sesión iniciada, pero el correo no se envió:\n{err}"
+        else:
+            aviso = ""
+
         return True, "", usuario, aviso
 
     @staticmethod

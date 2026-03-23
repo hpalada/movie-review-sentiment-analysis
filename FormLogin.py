@@ -1,10 +1,10 @@
-#formLogin.py
+# FormLogin.py
 import tkinter as tk
-from tkinter              import messagebox
-from ClaseLogin           import ClaseLogin
-from FormRegistroUsuario  import FormCrearUsuario
-from FormCambiarContra    import FormCambioPass
-from catalogoPrincipal import CatalogoWindow
+from tkinter             import messagebox
+from ClaseLogin          import ClaseLogin
+from FormRegistroUsuario import FormCrearUsuario
+from FormCambiarContra   import FormCambioPass
+from catalogoPrincipal   import CatalogoWindow
 
 BG       = "#0d0d1a"
 PANEL    = "#12122a"
@@ -41,7 +41,7 @@ def _mk_label(parent, text, font=FONT_LABEL, fg=TEXT):
 
 
 class FormLogin:
-    W, H = 440, 580
+    W, H = 440, 590
 
     def __init__(self):
         self.root = tk.Tk()
@@ -66,15 +66,17 @@ class FormLogin:
         canvas.create_oval(280, 390, 520, 630, fill="#0a1a3a", outline="")
 
         panel = tk.Frame(canvas, bg=PANEL, padx=40, pady=36)
-        canvas.create_window(220, 290, window=panel, width=360)
+        canvas.create_window(220, 295, window=panel, width=360)
 
-        _mk_label(panel, "◈  Bienvenido", font=FONT_TITLE, fg=ACCENT).pack(pady=(0, 4))
+        _mk_label(panel, "◈  Bienvenido",
+                  font=FONT_TITLE, fg=ACCENT).pack(pady=(0, 4))
         _mk_label(panel, "Ingresa tus credenciales para continuar",
                   font=FONT_SUB, fg=MUTED).pack(pady=(0, 24))
 
-        _mk_label(panel, "Correo electrónico").pack(anchor="w")
-        self.e_email = _mk_entry(panel)
-        self.e_email.pack(fill="x", ipady=8, pady=(4, 14))
+        # ── Campo unificado: acepta nombre de usuario O correo ────────
+        _mk_label(panel, "Usuario o correo electrónico").pack(anchor="w")
+        self.e_credencial = _mk_entry(panel)
+        self.e_credencial.pack(fill="x", ipady=8, pady=(4, 14))
 
         _mk_label(panel, "Contraseña").pack(anchor="w")
         self.e_pass = _mk_entry(panel, show="●")
@@ -85,13 +87,17 @@ class FormLogin:
         lnk.pack(anchor="e", pady=(0, 20))
         lnk.bind("<Button-1>", lambda _: FormCambioPass(self.root))
 
-        _mk_button(panel, "INGRESAR →", self._login).pack(fill="x", pady=(0, 14))
+        _mk_button(panel, "INGRESAR →",
+                   self._login).pack(fill="x", pady=(0, 14))
 
         sep = tk.Frame(panel, bg=PANEL)
         sep.pack(fill="x", pady=(0, 14))
-        tk.Frame(sep, bg=BORDER, height=1).pack(side="left", fill="x", expand=True, pady=6)
-        tk.Label(sep, text="  o  ", fg=MUTED, bg=PANEL, font=FONT_LABEL).pack(side="left")
-        tk.Frame(sep, bg=BORDER, height=1).pack(side="left", fill="x", expand=True, pady=6)
+        tk.Frame(sep, bg=BORDER, height=1).pack(
+            side="left", fill="x", expand=True, pady=6)
+        tk.Label(sep, text="  o  ", fg=MUTED, bg=PANEL,
+                 font=FONT_LABEL).pack(side="left")
+        tk.Frame(sep, bg=BORDER, height=1).pack(
+            side="left", fill="x", expand=True, pady=6)
 
         _mk_button(panel, "CREAR CUENTA",
                    lambda: FormCrearUsuario(self.root),
@@ -102,10 +108,11 @@ class FormLogin:
         self.lbl_status.pack(pady=(14, 0))
 
     def _login(self):
-        email    = self.e_email.get().strip()
-        password = self.e_pass.get()
+        # Acepta nombre de usuario O correo electrónico
+        credencial = self.e_credencial.get().strip()
+        password   = self.e_pass.get()
 
-        ok, error, usuario, aviso = ClaseLogin.autenticar(email, password)
+        ok, error, usuario, aviso = ClaseLogin.autenticar(credencial, password)
 
         if not ok:
             self.lbl_status.config(text=f"✗  {error}", fg=ERROR)
@@ -118,15 +125,10 @@ class FormLogin:
         if aviso:
             messagebox.showwarning("Aviso", aviso, parent=self.root)
 
-        rol_raw = str(usuario.get("rol", "lector")).lower().strip()
-        rol     = "admin" if rol_raw in ("admin", "administrador") else "lector"
-
-        # Pasamos el dict completo del usuario (incluye id, nombre_usuario, rol)
+        rol = usuario.get("rol", "lector")
         self.root.after(600, lambda: self._abrir_catalogo(usuario, rol))
 
     def _abrir_catalogo(self, usuario: dict, rol: str):
-        """Destruye la ventana Tk del login y lanza CatalogoWindow (PyQt6)."""
-
         self.root.destroy()
 
         from PyQt6.QtWidgets import QApplication
