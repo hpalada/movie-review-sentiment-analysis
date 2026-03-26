@@ -59,6 +59,66 @@
             ],
             "fecha_creacion": "2026-03-25T19:02:52.671681",
             "fecha_modificacion": null
+        },
+        {
+            "id": 7,
+            "usuario_id": 2,
+            "pelicula_id": 1,
+            "texto": "sdamkfhgjkdsfhlgjkfsdglkjfsdhglds",
+            "valoracion_ia": 3.02,
+            "etiquetas_ia": [
+                " Neutral"
+            ],
+            "fecha_creacion": "2026-03-26T13:18:42.801885",
+            "fecha_modificacion": null
+        },
+        {
+            "id": 8,
+            "usuario_id": 2,
+            "pelicula_id": 1,
+            "texto": "Esta película me dejó sin palabras. La actuación principal fue magistral y la fotografía simplemente impresionante. El director logró crear una atmósfera única que te atrapa desde el primer minuto hasta los créditos finales.",
+            "valoracion_ia": 3.42,
+            "etiquetas_ia": [
+                " Neutral"
+            ],
+            "fecha_creacion": "2026-03-26T13:49:53.604750",
+            "fecha_modificacion": null
+        },
+        {
+            "id": 9,
+            "usuario_id": 2,
+            "pelicula_id": 1,
+            "texto": "Una obra maestra absoluta. Hacía años que una película no me generaba tantas emociones al mismo tiempo. La banda sonora es perfecta, el guion no tiene un solo momento flojo y el elenco completo entrega actuaciones de otro nivel. Imprescindible.",
+            "valoracion_ia": 3.33,
+            "etiquetas_ia": [
+                " Neutral"
+            ],
+            "fecha_creacion": "2026-03-26T13:50:55.162514",
+            "fecha_modificacion": null
+        },
+        {
+            "id": 10,
+            "usuario_id": 2,
+            "pelicula_id": 1,
+            "texto": "Una obra maestra absoluta. Hacía años que una película no me generaba tantas emociones al mismo tiempo. La banda sonora es perfecta, el guion no tiene un solo momento flojo y el elenco completo entrega actuaciones de otro nivel. Imprescindible.",
+            "valoracion_ia": 3.33,
+            "etiquetas_ia": [
+                " Neutral"
+            ],
+            "fecha_creacion": "2026-03-26T13:52:08.458612",
+            "fecha_modificacion": null
+        },
+        {
+            "id": 11,
+            "usuario_id": 2,
+            "pelicula_id": 1,
+            "texto": "Una obra maestra absoluta. Hacía años que una película no me generaba tantas emociones al mismo tiempo. La banda sonora es perfecta, el guion no tiene un solo momento flojo y el elenco completo entrega actuaciones de otro nivel. Imprescindible.",
+            "valoracion_ia": 3.33,
+            "etiquetas_ia": [
+                " Neutral"
+            ],
+            "fecha_creacion": "2026-03-26T13:53:27.039563",
+            "fecha_modificacion": null
         }
     ]
 }

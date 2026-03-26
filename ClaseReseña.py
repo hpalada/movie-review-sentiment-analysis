@@ -4,24 +4,15 @@ from Json import JsonManager
 
 
 class Resena:
-    """
-    Capa de clase para el manejo de reseñas.
-    Recibe datos del formulario, los valida, los analiza con IA
-    y los persiste en el JSON.
-    """
 
     LONGITUD_MINIMA = 20
     LONGITUD_MAXIMA = 2000
 
     def __init__(self):
-        self.json   = JsonManager()
-        self._modelo = None   # se carga solo cuando se necesita (lazy)
+        self.json    = JsonManager()
+        self._modelo = None
 
     def _obtener_modelo(self):
-        """
-        Carga ComunicacionModelo solo la primera vez que se necesita.
-        Si falla, devuelve None y la reseña se guarda sin análisis IA.
-        """
         if self._modelo is not None:
             return self._modelo
         try:
@@ -33,11 +24,47 @@ class Resena:
         return self._modelo
 
     # ─────────────────────────────────────────
+    #  TRADUCCIÓN ES → EN
+    # ─────────────────────────────────────────
+
+    def _traducir_al_ingles(self, texto: str) -> str:
+        try:
+            import anthropic
+            client = anthropic.Anthropic()
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=2048,
+                messages=[{
+                    "role": "user",
+                    "content": (
+                        "Translate the following movie review from Spanish to English. "
+                        "Return ONLY the translated text, no explanations or extra content.\n\n"
+                        f"{texto}"
+                    )
+                }]
+            )
+            traduccion = response.content[0].text.strip()
+
+            # ── DEBUG ──────────────────────────────────────
+            print("=" * 60)
+            print(f"[TRADUCCIÓN] Original:\n{texto}")
+            print("-" * 60)
+            print(f"[TRADUCCIÓN] Resultado:\n{traduccion}")
+            print("=" * 60)
+            # ───────────────────────────────────────────────
+
+            return traduccion
+        except Exception as e:
+            print(f"[Aviso] Error al traducir: {e}")
+            return texto
+
+    # ─────────────────────────────────────────
     #  MÉTODO PRINCIPAL
     # ─────────────────────────────────────────
 
     def procesar_resena(self, usuario_id: int, titulo_pelicula: str,
-                        texto: str, anio: int = None, director: str = None) -> dict:
+                        texto: str, anio: int = None, director: str = None,
+                        idioma: str = "es") -> dict:
 
         validacion = self._validar_texto(texto)
         if not validacion["valido"]:
@@ -49,11 +76,13 @@ class Resena:
 
         pelicula = self.json.agregar_pelicula(titulo_pelicula, anio=anio, director=director)
 
-        # Intentar análisis IA — si falla se guarda con valores por defecto
+        # Traducir si el idioma es español
+        texto_para_ia = self._traducir_al_ingles(texto) if idioma == "es" else texto
+
         modelo = self._obtener_modelo()
         if modelo:
             try:
-                resultado_ia = modelo.analizar_resena(texto)
+                resultado_ia = modelo.analizar_resena(texto_para_ia)
                 valoracion   = resultado_ia["valoracion"]
                 etiquetas    = resultado_ia["etiquetas"]
             except Exception as e:
@@ -67,7 +96,7 @@ class Resena:
         resena_guardada = self.json.agregar_resena(
             usuario_id    = usuario_id,
             pelicula_id   = pelicula["id"],
-            texto         = texto.strip(),
+            texto         = texto.strip(),        # se guarda el texto original
             valoracion_ia = valoracion,
             etiquetas_ia  = etiquetas
         )
@@ -85,7 +114,8 @@ class Resena:
     #  EDITAR RESEÑA
     # ─────────────────────────────────────────
 
-    def editar_resena(self, resena_id: int, usuario_id: int, nuevo_texto: str) -> dict:
+    def editar_resena(self, resena_id: int, usuario_id: int,
+                      nuevo_texto: str, idioma: str = "es") -> dict:
 
         validacion = self._validar_texto(nuevo_texto)
         if not validacion["valido"]:
@@ -98,10 +128,13 @@ class Resena:
         if resena["usuario_id"] != usuario_id:
             return self._respuesta_error("No tienes permiso para editar esta reseña.")
 
+        # Traducir si el idioma es español
+        texto_para_ia = self._traducir_al_ingles(nuevo_texto) if idioma == "es" else nuevo_texto
+
         modelo = self._obtener_modelo()
         if modelo:
             try:
-                resultado_ia = modelo.analizar_resena(nuevo_texto)
+                resultado_ia = modelo.analizar_resena(texto_para_ia)
                 valoracion   = resultado_ia["valoracion"]
                 etiquetas    = resultado_ia["etiquetas"]
             except Exception as e:
@@ -115,7 +148,7 @@ class Resena:
         self.json.editar_resena(
             resena_id           = resena_id,
             usuario_id          = usuario_id,
-            nuevo_texto         = nuevo_texto.strip(),
+            nuevo_texto         = nuevo_texto.strip(),   # original
             nueva_valoracion_ia = valoracion,
             nuevas_etiquetas_ia = etiquetas
         )
