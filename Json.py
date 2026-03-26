@@ -18,6 +18,9 @@ class JsonManager:
         self._inicializar_archivo(self.archivo_usuarios,  {"usuarios": []})
         self._inicializar_archivo(self.archivo_resenas,   {"resenas": []})
 
+        # ── Sincronizar promedios al iniciar ──────────────────────────
+        self._sincronizar_promedios()
+
     # ─────────────────────────────────────────
     #  UTILIDADES INTERNAS
     # ─────────────────────────────────────────
@@ -39,6 +42,31 @@ class JsonManager:
         if not lista:
             return 1
         return max(item["id"] for item in lista) + 1
+
+    def _sincronizar_promedios(self):
+        """
+        Al iniciar, garantiza que TODAS las películas tengan el campo
+        promedio_calificacion. Si ya lo tienen, no los toca.
+        Si no lo tienen, lo calcula y lo escribe.
+        """
+        data    = self._cargar(self.archivo_peliculas)
+        cambios = False
+
+        for pelicula in data["peliculas"]:
+            if "promedio_calificacion" not in pelicula:
+                resenas = self.obtener_resenas_por_pelicula(pelicula["id"])
+                valoraciones = [
+                    r["valoracion_ia"] for r in resenas
+                    if isinstance(r.get("valoracion_ia"), (int, float))
+                ]
+                pelicula["promedio_calificacion"] = (
+                    round(sum(valoraciones) / len(valoraciones), 2)
+                    if valoraciones else None
+                )
+                cambios = True
+
+        if cambios:
+            self._guardar(self.archivo_peliculas, data)
 
     # ─────────────────────────────────────────
     #  USUARIOS
@@ -65,10 +93,6 @@ class JsonManager:
         )
 
     def obtener_usuario_por_nombre_o_email(self, credencial):
-        """
-        Busca un usuario por nombre_usuario O por email.
-        Útil para el login donde el usuario puede ingresar cualquiera de los dos.
-        """
         credencial = credencial.strip()
         for u in self.obtener_usuarios():
             if u["nombre_usuario"] == credencial:
@@ -79,10 +103,6 @@ class JsonManager:
 
     def agregar_usuario(self, nombre_usuario, contrasena_hash,
                         email="", rol="lector"):
-        """
-        Registra un nuevo usuario.
-        rol puede ser "admin" o "lector" (por defecto "lector").
-        """
         data = self._cargar(self.archivo_usuarios)
 
         if any(u["nombre_usuario"] == nombre_usuario for u in data["usuarios"]):
@@ -92,7 +112,6 @@ class JsonManager:
                          for u in data["usuarios"]):
             return None
 
-        # Normalizar rol
         rol_norm = "admin" if str(rol).lower().strip() in ("admin", "administrador") \
                    else "lector"
 
@@ -101,7 +120,7 @@ class JsonManager:
             "nombre_usuario" : nombre_usuario,
             "email"          : email.strip().lower(),
             "contrasena_hash": contrasena_hash,
-            "rol"            : rol_norm,          # ← campo nuevo
+            "rol"            : rol_norm,
             "fecha_registro" : datetime.now().isoformat()
         }
 
@@ -119,7 +138,6 @@ class JsonManager:
         return False
 
     def actualizar_rol(self, email, nuevo_rol):
-        """Cambia el rol de un usuario existente."""
         rol_norm = "admin" if str(nuevo_rol).lower().strip() in \
                    ("admin", "administrador") else "lector"
         data = self._cargar(self.archivo_usuarios)
@@ -160,13 +178,14 @@ class JsonManager:
             return existente
 
         nueva_pelicula = {
-            "id"         : self._generar_id(data["peliculas"]),
-            "titulo"     : titulo,
-            "descripcion": descripcion,
-            "imagen"     : imagen,
-            "fecha"      : fecha,
-            "anio"       : anio,
-            "director"   : director
+            "id"                   : self._generar_id(data["peliculas"]),
+            "titulo"               : titulo,
+            "descripcion"          : descripcion,
+            "imagen"               : imagen,
+            "fecha"                : fecha,
+            "anio"                 : anio,
+            "director"             : director,
+            "promedio_calificacion": None          # siempre presente desde el inicio
         }
 
         data["peliculas"].append(nueva_pelicula)
@@ -186,6 +205,12 @@ class JsonManager:
                 if anio        is not None: pelicula["anio"]        = anio
                 if director    is not None: pelicula["director"]    = director
 
+                # Garantiza que el campo siempre esté presente al editar
+                if "promedio_calificacion" not in pelicula:
+                    pelicula["promedio_calificacion"] = (
+                        self.calcular_promedio_pelicula(pelicula_id)
+                    )
+
                 self._guardar(self.archivo_peliculas, data)
                 return pelicula
 
@@ -201,6 +226,38 @@ class JsonManager:
             self._eliminar_resenas_de_pelicula(pelicula_id)
             return True
         return False
+
+    # ─────────────────────────────────────────
+    #  PROMEDIO DE CALIFICACIÓN
+    # ─────────────────────────────────────────
+
+    def calcular_promedio_pelicula(self, pelicula_id):
+        resenas = self.obtener_resenas_por_pelicula(pelicula_id)
+        valoraciones = [
+            r["valoracion_ia"] for r in resenas
+            if isinstance(r.get("valoracion_ia"), (int, float))
+        ]
+        if not valoraciones:
+            return None
+        return round(sum(valoraciones) / len(valoraciones), 2)
+
+    def actualizar_promedio_pelicula(self, pelicula_id):
+        data     = self._cargar(self.archivo_peliculas)
+        promedio = self.calcular_promedio_pelicula(pelicula_id)
+
+        for pelicula in data["peliculas"]:
+            if pelicula["id"] == pelicula_id:
+                pelicula["promedio_calificacion"] = promedio
+                self._guardar(self.archivo_peliculas, data)
+                return promedio
+
+        return None
+
+    def recalcular_todos_los_promedios(self):
+        peliculas = self.obtener_peliculas()
+        for pelicula in peliculas:
+            self.actualizar_promedio_pelicula(pelicula["id"])
+        print(f"✅ Promedios actualizados para {len(peliculas)} películas.")
 
     # ─────────────────────────────────────────
     #  RESEÑAS
@@ -237,6 +294,7 @@ class JsonManager:
 
         data["resenas"].append(nueva_resena)
         self._guardar(self.archivo_resenas, data)
+        self.actualizar_promedio_pelicula(pelicula_id)
         return nueva_resena
 
     def editar_resena(self, resena_id, usuario_id, nuevo_texto,
@@ -252,12 +310,13 @@ class JsonManager:
                 resena["etiquetas_ia"]       = nuevas_etiquetas_ia
                 resena["fecha_modificacion"] = datetime.now().isoformat()
                 self._guardar(self.archivo_resenas, data)
+                self.actualizar_promedio_pelicula(resena["pelicula_id"])
                 return resena
 
         return None
 
     def eliminar_resena(self, resena_id, usuario_id):
-        data  = self._cargar(self.archivo_resenas)
+        data   = self._cargar(self.archivo_resenas)
         resena = next((r for r in data["resenas"] if r["id"] == resena_id), None)
 
         if resena is None:
@@ -265,8 +324,10 @@ class JsonManager:
         if resena["usuario_id"] != usuario_id:
             return False
 
+        pelicula_id = resena["pelicula_id"]
         data["resenas"] = [r for r in data["resenas"] if r["id"] != resena_id]
         self._guardar(self.archivo_resenas, data)
+        self.actualizar_promedio_pelicula(pelicula_id)
         return True
 
     def _eliminar_resenas_de_pelicula(self, pelicula_id):
@@ -311,13 +372,14 @@ class JsonManager:
         id_resena = 1
         for pelicula in peliculas_antiguas:
             nueva_pelicula = {
-                "id"         : pelicula.get("id"),
-                "titulo"     : pelicula.get("titulo", ""),
-                "descripcion": pelicula.get("descripcion", None),
-                "imagen"     : pelicula.get("imagen", None),
-                "fecha"      : pelicula.get("fecha", None),
-                "anio"       : None,
-                "director"   : None
+                "id"                   : pelicula.get("id"),
+                "titulo"               : pelicula.get("titulo", ""),
+                "descripcion"          : pelicula.get("descripcion", None),
+                "imagen"               : pelicula.get("imagen", None),
+                "fecha"                : pelicula.get("fecha", None),
+                "anio"                 : None,
+                "director"             : None,
+                "promedio_calificacion": None      # siempre presente desde migración
             }
             data_peliculas["peliculas"].append(nueva_pelicula)
 
@@ -340,6 +402,8 @@ class JsonManager:
         self._guardar(self.archivo_peliculas, data_peliculas)
         self._guardar(self.archivo_usuarios,  data_usuarios)
         self._guardar(self.archivo_resenas,   data_resenas)
+
+        self.recalcular_todos_los_promedios()
 
         print(f"✅ Migración completa:")
         print(f"   • {len(data_peliculas['peliculas'])} películas migradas")

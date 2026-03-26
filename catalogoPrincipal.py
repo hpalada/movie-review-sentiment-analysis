@@ -2,13 +2,16 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QScrollArea, QFrame, QGridLayout, QSizePolicy,
-    QMessageBox, QApplication, QGraphicsOpacityEffect, QStackedWidget
+    QMessageBox, QApplication, QStackedWidget
 )
-from PyQt6.QtGui import QPixmap, QFont, QColor, QPalette, QCursor, QIcon
-from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal, QThread, QPropertyAnimation, QEasingCurve, QRect
+from PyQt6.QtGui import QPixmap, QCursor
+from PyQt6.QtCore import Qt, pyqtSignal
 
 import os
 import sys
+
+from Json import JsonManager
+from rutas import ruta_imagen
 
 # ── Importamos la capa de modelo ──────────────────────────────────────
 try:
@@ -20,7 +23,6 @@ try:
     def _del(p): p.eliminar()
     USE_MODEL = True
 except ImportError:
-    from Json import JsonManager
     _db = JsonManager()
     class _FakePelicula:
         def __init__(self, d):
@@ -46,40 +48,23 @@ class MovieCard(QFrame):
     def __init__(self, pelicula, es_admin=False, parent=None):
         super().__init__(parent)
         self.pelicula = pelicula
-        self.es_admin = es_admin          # ← controla si aparecen los botones CRUD
+        self.es_admin = es_admin
+        self._db      = JsonManager()
         self._build()
 
     def _build(self):
-        # Altura fija: admin → 340 (necesita espacio para botones extra)
-        #              lector → 280
-        altura = 340 if self.es_admin else 280
-        self.setFixedSize(220, altura)
-        self.setObjectName("MovieCard")
-        self.setStyleSheet("""
-            QFrame#MovieCard {
-                background: #1e2130;
-                border-radius: 14px;
-                border: 1px solid #2a2f45;
-            }
-            QFrame#MovieCard:hover {
-                border: 1px solid #00c8b4;
-            }
-        """)
+        self.setFixedSize(220, 360 if self.es_admin else 310)
+        self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 12)
+        root.setContentsMargins(0, 0, 0, 6)
         root.setSpacing(0)
 
         # ── Imagen ────────────────────────────────────────────────────
         self.img_label = QLabel()
-        self.img_label.setFixedSize(220, 160)
-        self.img_label.setScaledContents(True)
-        self.img_label.setStyleSheet(
-            "border-top-left-radius: 14px;"
-            "border-top-right-radius: 14px;"
-            "background: #12141f;"
-        )
+        self.img_label.setFixedSize(220, 200)
+        self.img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.img_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self._cargar_imagen()
         self.img_label.mousePressEvent = lambda e: (
@@ -88,20 +73,15 @@ class MovieCard(QFrame):
         )
         root.addWidget(self.img_label)
 
-        # ── Título + estrella ─────────────────────────────────────────
+        # ── Título ────────────────────────────────────────────────────
         fila = QHBoxLayout()
-        fila.setContentsMargins(10, 8, 10, 4)
+        fila.setContentsMargins(8, 4, 8, 0)
         titulo = QLabel(self.pelicula.titulo or "Sin título")
-        titulo.setStyleSheet("color:#e8eaf0; font-size:13px; font-weight:600;")
         titulo.setWordWrap(False)
         titulo.setMaximumWidth(170)
         titulo.setSizePolicy(QSizePolicy.Policy.Expanding,
                              QSizePolicy.Policy.Preferred)
-        star = QLabel("★")
-        star.setStyleSheet("color:#00c8b4; font-size:16px;")
-        star.setFixedWidth(20)
         fila.addWidget(titulo)
-        fila.addWidget(star)
         root.addLayout(fila)
 
         # ── Año / director ────────────────────────────────────────────
@@ -113,84 +93,71 @@ class MovieCard(QFrame):
                    else self.pelicula.director
         if meta:
             lbl_meta = QLabel(meta)
-            lbl_meta.setContentsMargins(10, 0, 10, 2)
-            lbl_meta.setStyleSheet("color:#6b7080; font-size:11px;")
+            lbl_meta.setContentsMargins(8, 0, 8, 0)
             root.addWidget(lbl_meta)
+
+        # ── Promedio ──────────────────────────────────────────────────
+        self.lbl_promedio = QLabel()
+        self.lbl_promedio.setContentsMargins(8, 0, 8, 2)
+        self._actualizar_promedio()
+        root.addWidget(self.lbl_promedio)
 
         root.addStretch()
 
-        # ── Botón Explorar (siempre visible) ──────────────────────────
+        # ── Botón Explorar ────────────────────────────────────────────
         btn_exp = QPushButton("Explore & Review")
-        btn_exp.setFixedHeight(32)
-        btn_exp.setStyleSheet("""
-            QPushButton {
-                background: #00c8b4;
-                color: #0d0f1a;
-                border: none;
-                border-radius: 8px;
-                font-size: 12px;
-                font-weight: 700;
-                margin: 0 10px;
-            }
-            QPushButton:hover  { background: #00e5cf; }
-            QPushButton:pressed{ background: #009e8d; }
-        """)
+        btn_exp.setFixedHeight(28)
+        btn_exp.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_exp.clicked.connect(lambda: self.explore_clicked.emit(self.pelicula))
         root.addWidget(btn_exp)
 
-        # ── Botones CRUD — SOLO si es admin ───────────────────────────
+        # ── Botones CRUD — solo admin ─────────────────────────────────
         if self.es_admin:
             fila_crud = QHBoxLayout()
-            fila_crud.setContentsMargins(10, 6, 10, 0)
+            fila_crud.setContentsMargins(8, 4, 8, 0)
             fila_crud.setSpacing(6)
 
-            btn_edit = QPushButton("✏  Editar")
-            btn_edit.setFixedHeight(30)
-            btn_edit.setStyleSheet("""
-                QPushButton {
-                    background: #2a2f45;
-                    color: #e8eaf0;
-                    border: none;
-                    border-radius: 7px;
-                    font-size: 11px;
-                    font-weight: 600;
-                }
-                QPushButton:hover { background: #3a4060; }
-            """)
+            btn_edit = QPushButton("Editar")
+            btn_edit.setFixedHeight(26)
+            btn_edit.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_edit.clicked.connect(lambda: self.edit_clicked.emit(self.pelicula))
 
-            btn_del = QPushButton("🗑  Eliminar")
-            btn_del.setFixedHeight(30)
-            btn_del.setStyleSheet("""
-                QPushButton {
-                    background: #3d1a1a;
-                    color: #e05555;
-                    border: 1px solid #7a2222;
-                    border-radius: 7px;
-                    font-size: 11px;
-                    font-weight: 600;
-                }
-                QPushButton:hover { background: #5a2020; }
-            """)
+            btn_del = QPushButton("Eliminar")
+            btn_del.setFixedHeight(26)
+            btn_del.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_del.clicked.connect(lambda: self.delete_clicked.emit(self.pelicula))
 
             fila_crud.addWidget(btn_edit)
             fila_crud.addWidget(btn_del)
             root.addLayout(fila_crud)
 
+    def _actualizar_promedio(self):
+        pelicula_id = getattr(self.pelicula, "id", None)
+        if pelicula_id is None:
+            self.lbl_promedio.setText("Promedio: —")
+            return
+
+        data     = self._db.obtener_pelicula_por_id(pelicula_id)
+        promedio = data.get("promedio_calificacion") if data else None
+
+        if promedio is not None:
+            self.lbl_promedio.setText(f"Promedio: {promedio} / 5")
+        else:
+            self.lbl_promedio.setText("Promedio: sin reseñas")
+
     def _cargar_imagen(self):
-        ruta = getattr(self.pelicula, "imagen", None)
+        ruta = ruta_imagen(getattr(self.pelicula, "imagen", None))
         if ruta and os.path.exists(ruta):
             px = QPixmap(ruta)
             if not px.isNull():
-                self.img_label.setPixmap(px)
+                self.img_label.setPixmap(
+                    px.scaled(220, 200,
+                              Qt.AspectRatioMode.KeepAspectRatio,
+                              Qt.TransformationMode.SmoothTransformation)
+                )
                 return
         self.img_label.setText((self.pelicula.titulo or "?")[:2].upper())
         self.img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.img_label.setStyleSheet(
-            "border-top-left-radius:14px; border-top-right-radius:14px;"
-            "background:#12141f; color:#2a2f45; font-size:40px; font-weight:800;"
-        )
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -202,39 +169,24 @@ class DetailDialog(QWidget):
     request_reviews = pyqtSignal(object)
 
     def __init__(self, pelicula, es_admin=False, parent=None):
-        super().__init__(parent,
-            Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        super().__init__(parent, Qt.WindowType.Dialog)
         self.pelicula = pelicula
-        self.es_admin = es_admin          # ← controla botones Editar/Eliminar
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.es_admin = es_admin
         self._build()
-        self.setFixedSize(460, 540)
+        self.setFixedSize(460, 480)
 
     def _build(self):
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
+        self.setWindowTitle(self.pelicula.titulo or "Detalle")
 
-        card = QFrame()
-        card.setStyleSheet("""
-            QFrame {
-                background: #1a1d2e;
-                border-radius: 18px;
-                border: 1px solid #2a2f45;
-            }
-        """)
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(0, 0, 0, 20)
-        layout.setSpacing(0)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
 
         img = QLabel()
-        img.setFixedSize(460, 240)
+        img.setFixedSize(428, 200)
         img.setScaledContents(True)
         img.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        img.setStyleSheet(
-            "border-top-left-radius:18px; border-top-right-radius:18px;"
-            "background:#12141f;"
-        )
-        ruta = getattr(self.pelicula, "imagen", None)
+        ruta = ruta_imagen(getattr(self.pelicula, "imagen", None))
         if ruta and os.path.exists(ruta):
             px = QPixmap(ruta)
             if not px.isNull():
@@ -242,86 +194,48 @@ class DetailDialog(QWidget):
         else:
             img.setText((self.pelicula.titulo or "?")[:2].upper())
             img.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            img.setStyleSheet(
-                "border-top-left-radius:18px; border-top-right-radius:18px;"
-                "background:#12141f; color:#2a2f45; font-size:60px; font-weight:900;"
-            )
         img.mousePressEvent = lambda e: (
             (self.request_reviews.emit(self.pelicula), self.close())
             if e.button() == Qt.MouseButton.LeftButton else None
         )
         layout.addWidget(img)
 
-        content = QVBoxLayout()
-        content.setContentsMargins(24, 16, 24, 0)
-        content.setSpacing(8)
-
         titulo = QLabel(self.pelicula.titulo or "Sin título")
-        titulo.setStyleSheet("color:#e8eaf0; font-size:22px; font-weight:800;")
-        content.addWidget(titulo)
+        layout.addWidget(titulo)
 
         metas = []
-        if getattr(self.pelicula, "anio",      None): metas.append(str(self.pelicula.anio))
-        if getattr(self.pelicula, "director",  None): metas.append(self.pelicula.director)
-        if getattr(self.pelicula, "fecha",     None): metas.append(self.pelicula.fecha)
+        if getattr(self.pelicula, "anio",     None): metas.append(str(self.pelicula.anio))
+        if getattr(self.pelicula, "director", None): metas.append(self.pelicula.director)
+        if getattr(self.pelicula, "fecha",    None): metas.append(self.pelicula.fecha)
         if metas:
-            meta_lbl = QLabel("  ·  ".join(metas))
-            meta_lbl.setStyleSheet("color:#00c8b4; font-size:12px;")
-            content.addWidget(meta_lbl)
+            layout.addWidget(QLabel("  ·  ".join(metas)))
 
         if getattr(self.pelicula, "descripcion", None):
             desc = QLabel(self.pelicula.descripcion)
             desc.setWordWrap(True)
-            desc.setStyleSheet("color:#9097b0; font-size:13px;")
-            content.addWidget(desc)
+            layout.addWidget(desc)
 
-        content.addStretch()
+        layout.addStretch()
 
         btns = QHBoxLayout()
-        btns.setSpacing(10)
+        btns.setSpacing(8)
 
-        # Explorar siempre visible
-        btn_review = QPushButton("⭐  Explore & Review")
-        btn_review.setFixedHeight(36)
-        btn_review.setStyleSheet("""
-            QPushButton {
-                background:#00c8b4; color:#0d0f1a;
-                border:none; border-radius:8px;
-                font-size:13px; font-weight:700;
-            }
-            QPushButton:hover { background:#00e5cf; }
-        """)
+        btn_review = QPushButton("Explore & Review")
+        btn_review.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_review.clicked.connect(lambda: (
             self.request_reviews.emit(self.pelicula), self.close()
         ))
         btns.addWidget(btn_review)
 
-        # Editar y Eliminar solo para admin
         if self.es_admin:
-            btn_edit = QPushButton("✏  Editar")
-            btn_edit.setFixedHeight(36)
-            btn_edit.setStyleSheet("""
-                QPushButton {
-                    background:#2a2f45; color:#e8eaf0;
-                    border:none; border-radius:8px;
-                    font-size:13px; font-weight:600;
-                }
-                QPushButton:hover { background:#3a4060; }
-            """)
+            btn_edit = QPushButton("Editar")
+            btn_edit.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_edit.clicked.connect(lambda: (
                 self.request_edit.emit(self.pelicula), self.close()
             ))
 
-            btn_del = QPushButton("🗑  Eliminar")
-            btn_del.setFixedHeight(36)
-            btn_del.setStyleSheet("""
-                QPushButton {
-                    background:#3d1a1a; color:#e05555;
-                    border:1px solid #7a2222; border-radius:8px;
-                    font-size:13px; font-weight:600;
-                }
-                QPushButton:hover { background:#5a2020; }
-            """)
+            btn_del = QPushButton("Eliminar")
+            btn_del.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_del.clicked.connect(lambda: (
                 self.request_delete.emit(self.pelicula), self.close()
             ))
@@ -331,21 +245,12 @@ class DetailDialog(QWidget):
 
         btns.addStretch()
 
-        btn_close = QPushButton("✕")
-        btn_close.setFixedSize(36, 36)
-        btn_close.setStyleSheet("""
-            QPushButton {
-                background:#2a2f45; color:#9097b0;
-                border:none; border-radius:8px; font-size:14px;
-            }
-            QPushButton:hover { background:#3a4060; color:#e8eaf0; }
-        """)
+        btn_close = QPushButton("Cerrar")
+        btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_close.clicked.connect(self.close)
         btns.addWidget(btn_close)
 
-        content.addLayout(btns)
-        layout.addLayout(content)
-        outer.addWidget(card)
+        layout.addLayout(btns)
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -357,47 +262,20 @@ class AddMovieCard(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedSize(220, 340)
-        self.setObjectName("AddMovieCard")
+        self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.setStyleSheet("""
-            QFrame#AddMovieCard {
-                background: #13162200;
-                border-radius: 14px;
-                border: 2px dashed #2a2f45;
-            }
-            QFrame#AddMovieCard:hover {
-                background: #1a1f3a;
-                border: 2px dashed #00c8b4;
-            }
-        """)
+
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(12)
+        layout.setSpacing(8)
 
-        icon = QLabel("＋")
+        icon = QLabel("+")
         icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon.setStyleSheet("color:#2a2f45; font-size:52px; font-weight:300; border:none;")
-        icon.setObjectName("AddIcon")
+        layout.addWidget(icon)
 
         text = QLabel("Agregar película")
         text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        text.setStyleSheet("color:#3a4565; font-size:13px; font-weight:600; border:none;")
-        text.setObjectName("AddText")
-
-        layout.addWidget(icon)
         layout.addWidget(text)
-        self._icon = icon
-        self._text = text
-
-    def enterEvent(self, event):
-        self._icon.setStyleSheet("color:#00c8b4; font-size:52px; font-weight:300; border:none;")
-        self._text.setStyleSheet("color:#00c8b4; font-size:13px; font-weight:600; border:none;")
-        super().enterEvent(event)
-
-    def leaveEvent(self, event):
-        self._icon.setStyleSheet("color:#2a2f45; font-size:52px; font-weight:300; border:none;")
-        self._text.setStyleSheet("color:#3a4565; font-size:13px; font-weight:600; border:none;")
-        super().leaveEvent(event)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -411,49 +289,27 @@ class AddMovieCard(QFrame):
 class UserBadge(QFrame):
     def __init__(self, nombre: str, rol: str, parent=None):
         super().__init__(parent)
-        self.setObjectName("UserBadge")
-        self.setStyleSheet("""
-            QFrame#UserBadge {
-                background: #1e2130;
-                border-radius: 20px;
-                border: 1px solid #2a2f45;
-            }
-        """)
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 6, 14, 6)
+        layout.setContentsMargins(8, 4, 12, 4)
         layout.setSpacing(8)
 
         avatar = QLabel(nombre[0].upper() if nombre else "?")
-        avatar.setFixedSize(30, 30)
+        avatar.setFixedSize(28, 28)
         avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        color_avatar = "#00c8b4" if rol == "admin" else "#6b7080"
-        avatar.setStyleSheet(f"""
-            background: {color_avatar};
-            color: #0d0f1a;
-            border-radius: 15px;
-            font-size: 14px;
-            font-weight: 800;
-        """)
+        layout.addWidget(avatar)
 
         info = QVBoxLayout()
         info.setSpacing(0)
         info.setContentsMargins(0, 0, 0, 0)
 
-        lbl_nombre = QLabel(nombre)
-        lbl_nombre.setStyleSheet(
-            "color:#e8eaf0; font-size:12px; font-weight:700;"
-            "background:transparent; border:none;"
-        )
+        lbl_nombre  = QLabel(nombre)
         rol_display = "Administrador" if rol == "admin" else "Lector"
-        rol_color   = "#00c8b4"       if rol == "admin" else "#6b7080"
-        lbl_rol = QLabel(rol_display)
-        lbl_rol.setStyleSheet(
-            f"color:{rol_color}; font-size:10px; font-weight:500;"
-            "background:transparent; border:none;"
-        )
+        lbl_rol     = QLabel(rol_display)
+
         info.addWidget(lbl_nombre)
         info.addWidget(lbl_rol)
-        layout.addWidget(avatar)
         layout.addLayout(info)
 
 
@@ -467,7 +323,6 @@ class CatalogoWindow(QWidget):
     def __init__(self, usuario="usuario", rol: str = "lector", parent=None):
         super().__init__(parent)
 
-        # Normalizar usuario (str o dict)
         if isinstance(usuario, dict):
             self.usuario_dict = usuario
             self.usuario      = usuario.get("nombre_usuario", "usuario")
@@ -483,88 +338,49 @@ class CatalogoWindow(QWidget):
 
         self.setWindowTitle("CineLog — Catálogo")
         self.setMinimumSize(900, 620)
-        self.setStyleSheet("background:#0d0f1a;")
         self._build_ui()
         self._cargar_catalogo()
 
     def _build_ui(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(24, 20, 24, 20)
-        root.setSpacing(16)
+        root.setContentsMargins(16, 12, 16, 12)
+        root.setSpacing(10)
 
         # ── Header ────────────────────────────────────────────────────
         header = QHBoxLayout()
-        welcome = QLabel()
-        welcome.setText(
-            f'<span style="color:#e8eaf0; font-size:22px; font-weight:700;">CineLog — </span>'
-            f'<span style="color:#00c8b4; font-size:22px; font-weight:700;">Catálogo</span>'
-        )
+
+        welcome = QLabel("CineLog — Catálogo")
         header.addWidget(welcome)
         header.addStretch()
 
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍  Search Movies...")
-        self.search_input.setFixedSize(240, 38)
-        self.search_input.setStyleSheet("""
-            QLineEdit {
-                background:#1e2130;
-                border: 1px solid #2a2f45;
-                border-radius: 19px;
-                padding: 0 16px;
-                color: #e8eaf0;
-                font-size: 13px;
-            }
-            QLineEdit:focus { border-color: #00c8b4; }
-        """)
+        self.search_input.setPlaceholderText("Buscar películas...")
+        self.search_input.setFixedSize(220, 28)
         self.search_input.textChanged.connect(self._on_search)
         header.addWidget(self.search_input)
 
-        # Botón Añadir — solo admin
         if self.es_admin:
-            btn_add = QPushButton("＋ Añadir película")
-            btn_add.setFixedHeight(38)
-            btn_add.setStyleSheet("""
-                QPushButton {
-                    background:#00c8b4; color:#0d0f1a;
-                    border:none; border-radius:10px;
-                    font-size:13px; font-weight:700;
-                    padding: 0 18px;
-                }
-                QPushButton:hover { background:#00e5cf; }
-            """)
+            btn_add = QPushButton("+ Añadir película")
+            btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_add.clicked.connect(self._abrir_agregar)
-            header.addSpacing(10)
+            header.addSpacing(8)
             header.addWidget(btn_add)
 
-        header.addSpacing(12)
+        header.addSpacing(10)
         header.addWidget(UserBadge(self.usuario, self.rol))
         root.addLayout(header)
 
         self.count_label = QLabel()
-        self.count_label.setStyleSheet("color:#6b7080; font-size:12px;")
         root.addWidget(self.count_label)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("""
-            QScrollArea { background: transparent; }
-            QScrollBar:vertical {
-                background:#1a1d2e; width:6px; border-radius:3px;
-            }
-            QScrollBar::handle:vertical {
-                background:#2a2f45; border-radius:3px;
-            }
-            QScrollBar::handle:vertical:hover { background:#00c8b4; }
-            QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical { height:0; }
-        """)
 
         self.grid_container = QWidget()
-        self.grid_container.setStyleSheet("background: transparent;")
         self.grid_layout = QGridLayout(self.grid_container)
-        self.grid_layout.setSpacing(20)
+        self.grid_layout.setSpacing(16)
         self.grid_layout.setContentsMargins(0, 0, 0, 0)
 
         scroll.setWidget(self.grid_container)
@@ -572,7 +388,6 @@ class CatalogoWindow(QWidget):
 
         self.empty_label = QLabel("No hay películas.")
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty_label.setStyleSheet("color:#3a4060; font-size:16px;")
         self.empty_label.hide()
         root.addWidget(self.empty_label)
 
@@ -582,7 +397,6 @@ class CatalogoWindow(QWidget):
         self._render_grid(peliculas)
 
     def _render_grid(self, peliculas):
-        # Limpiar grid
         while self.grid_layout.count():
             item = self.grid_layout.takeAt(0)
             if item.widget():
@@ -603,48 +417,33 @@ class CatalogoWindow(QWidget):
         )
 
         for i, peli in enumerate(peliculas):
-            # Pasamos es_admin a cada tarjeta → controla si aparecen Editar/Eliminar
             card = MovieCard(peli, es_admin=self.es_admin)
             card.explore_clicked.connect(self._navigate_to_reviews)
             card.edit_clicked.connect(self._abrir_editar)
             card.delete_clicked.connect(self._confirmar_eliminar)
             self.grid_layout.addWidget(card, i // COLS, i % COLS)
 
-        # Tarjeta ＋ al final — solo admin
         if self.es_admin:
             add_card = AddMovieCard()
             add_card.clicked.connect(self._abrir_agregar)
-            next_pos  = len(peliculas)
+            next_pos = len(peliculas)
             self.grid_layout.addWidget(add_card, next_pos // COLS, next_pos % COLS)
 
     def _on_search(self, text):
         self._cargar_catalogo(text.strip())
 
     # ── Acciones CRUD ─────────────────────────────────────────────────
-
     def _abrir_agregar(self):
-        """Abre FormAgregaryEditar para crear una película nueva."""
-        try:
-            from FormAgregaryEditar import FormAgregaryEditar
-            form = FormAgregaryEditar(pelicula=None, parent=self)
-            form.pelicula_guardada.connect(lambda: self.refresh())
-            form.show()
-        except ImportError:
-            # Fallback si FormAgregaryEditar no existe aún
-            self.open_edit.emit(None)
+        from peliculaUI import PeliculaUI
+        form = PeliculaUI(pelicula=None, callback=self.refresh, parent=self)
+        form.show()
 
     def _abrir_editar(self, pelicula):
-        """Abre FormAgregaryEditar para editar una película existente."""
-        try:
-            from FormAgregaryEditar import FormAgregaryEditar
-            form = FormAgregaryEditar(pelicula=pelicula, parent=self)
-            form.pelicula_guardada.connect(lambda: self.refresh())
-            form.show()
-        except ImportError:
-            self.open_edit.emit(pelicula)
+        from peliculaUI import PeliculaUI
+        form = PeliculaUI(pelicula=pelicula, callback=self.refresh, parent=self)
+        form.show()
 
     def _confirmar_eliminar(self, pelicula):
-        """Confirma y ejecuta la eliminación de una película."""
         r = QMessageBox.question(
             self, "Eliminar película",
             f"¿Eliminar «{pelicula.titulo}»?\nTambién se borrarán sus reseñas.",
@@ -693,6 +492,10 @@ class CatalogoWindow(QWidget):
             lambda obj=form: self._ventanas_resenas.remove(obj)
             if obj in self._ventanas_resenas else None
         )
+
+        # Al cerrar FormResenas, refrescar catálogo para actualizar promedios
+        form.destroyed.connect(lambda: self.refresh())
+
         form.show()
         form.raise_()
         form.activateWindow()
@@ -715,30 +518,17 @@ class _PlaceholderReviews(QWidget):
     def __init__(self, pelicula, usuario, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Reseñas — {pelicula.titulo}")
-        self.setStyleSheet("background:#0d0f1a;")
         self.setMinimumSize(900, 620)
+
         lay = QVBoxLayout(self)
         lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl = QLabel(
-            f'<div style="text-align:center;">'
-            f'<span style="color:#00c8b4; font-size:28px; font-weight:800;">'
-            f'{pelicula.titulo}</span><br>'
-            f'<span style="color:#6b7080; font-size:14px;">'
-            f'FormResenas.py aún no está disponible.</span>'
-            f'</div>'
-        )
+
+        lbl = QLabel(f"{pelicula.titulo}\nFormResenas.py aún no está disponible.")
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay.addWidget(lbl)
+
         btn_back = QPushButton("← Volver al catálogo")
-        btn_back.setFixedSize(220, 40)
-        btn_back.setStyleSheet("""
-            QPushButton {
-                background:#1e2130; color:#00c8b4;
-                border:1px solid #00c8b4; border-radius:10px;
-                font-size:13px; font-weight:700;
-            }
-            QPushButton:hover { background:#00c8b4; color:#0d0f1a; }
-        """)
+        btn_back.setFixedSize(200, 36)
         btn_back.clicked.connect(self._cerrar)
         lay.addWidget(btn_back, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -758,7 +548,6 @@ if __name__ == "__main__":
     app.setStyle("Fusion")
 
     try:
-        from Json import JsonManager
         db = JsonManager()
         if not db.obtener_peliculas():
             demos = [

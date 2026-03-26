@@ -1,150 +1,122 @@
-# FormLogin.py
-import tkinter as tk
-from tkinter             import messagebox
+from PyQt6.QtWidgets import (
+    QWidget, QLabel, QLineEdit, QPushButton,
+    QVBoxLayout, QHBoxLayout, QMessageBox, QApplication
+)
+from PyQt6.QtCore import Qt, QTimer
+import sys
+
 from ClaseLogin          import ClaseLogin
 from FormRegistroUsuario import FormCrearUsuario
 from FormCambiarContra   import FormCambioPass
 from catalogoPrincipal   import CatalogoWindow
 
-BG       = "#0d0d1a"
-PANEL    = "#12122a"
-ACCENT   = "#6c63ff"
-ACCENT2  = "#ff6b9d"
-TEXT     = "#e8e8f0"
-MUTED    = "#6b6b8a"
-ENTRY_BG = "#1c1c38"
-BORDER   = "#2a2a50"
-SUCCESS  = "#4ade80"
-ERROR    = "#f87171"
 
-FONT_TITLE = ("Georgia", 26, "bold")
-FONT_SUB   = ("Georgia", 11, "italic")
-FONT_LABEL = ("Helvetica", 10)
-FONT_ENTRY = ("Helvetica", 11)
-FONT_BTN   = ("Helvetica", 11, "bold")
-FONT_LINK  = ("Helvetica", 9, "underline")
-
-def _mk_entry(parent, show=None):
-    return tk.Entry(parent, show=show, bg=ENTRY_BG, fg=TEXT,
-                    insertbackground=ACCENT, relief="flat", font=FONT_ENTRY,
-                    bd=0, highlightthickness=1,
-                    highlightcolor=ACCENT, highlightbackground=BORDER)
-
-def _mk_button(parent, text, cmd, color=ACCENT, fg="white"):
-    return tk.Button(parent, text=text, command=cmd, bg=color, fg=fg,
-                     font=FONT_BTN, relief="flat", bd=0, padx=20, pady=10,
-                     cursor="hand2", activebackground=ACCENT2,
-                     activeforeground="white")
-
-def _mk_label(parent, text, font=FONT_LABEL, fg=TEXT):
-    return tk.Label(parent, text=text, font=font, fg=fg, bg=PANEL)
-
-
-class FormLogin:
-    W, H = 440, 590
+class FormLogin(QWidget):
 
     def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("Iniciar Sesión")
-        self.root.resizable(False, False)
-        self.root.configure(bg=BG)
+        super().__init__()
+        self.setWindowTitle("Iniciar Sesión")
+        self.setFixedSize(340, 280)
         self._centrar()
         self._construir()
-        self.root.mainloop()
 
     def _centrar(self):
-        self.root.update_idletasks()
-        x = (self.root.winfo_screenwidth()  - self.W) // 2
-        y = (self.root.winfo_screenheight() - self.H) // 2
-        self.root.geometry(f"{self.W}x{self.H}+{x}+{y}")
+        screen = QApplication.primaryScreen().availableGeometry()
+        x = (screen.width()  - self.width())  // 2
+        y = (screen.height() - self.height()) // 2
+        self.move(x, y)
 
     def _construir(self):
-        canvas = tk.Canvas(self.root, width=self.W, height=self.H,
-                           bg=BG, highlightthickness=0)
-        canvas.pack(fill="both", expand=True)
-        canvas.create_oval(-80, -80, 200, 200, fill="#1a0a3a", outline="")
-        canvas.create_oval(280, 390, 520, 630, fill="#0a1a3a", outline="")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(8)
 
-        panel = tk.Frame(canvas, bg=PANEL, padx=40, pady=36)
-        canvas.create_window(220, 295, window=panel, width=360)
+        # Título
+        lbl_titulo = QLabel("Iniciar Sesión")
+        lbl_titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(lbl_titulo)
 
-        _mk_label(panel, "◈  Bienvenido",
-                  font=FONT_TITLE, fg=ACCENT).pack(pady=(0, 4))
-        _mk_label(panel, "Ingresa tus credenciales para continuar",
-                  font=FONT_SUB, fg=MUTED).pack(pady=(0, 24))
+        # Campo usuario o correo
+        lbl_credencial = QLabel("Usuario o correo electrónico:")
+        layout.addWidget(lbl_credencial)
 
-        # ── Campo unificado: acepta nombre de usuario O correo ────────
-        _mk_label(panel, "Usuario o correo electrónico").pack(anchor="w")
-        self.e_credencial = _mk_entry(panel)
-        self.e_credencial.pack(fill="x", ipady=8, pady=(4, 14))
+        self.e_credencial = QLineEdit()
+        self.e_credencial.setPlaceholderText("Usuario o correo")
+        layout.addWidget(self.e_credencial)
 
-        _mk_label(panel, "Contraseña").pack(anchor="w")
-        self.e_pass = _mk_entry(panel, show="●")
-        self.e_pass.pack(fill="x", ipady=8, pady=(4, 6))
+        # Campo contraseña
+        lbl_pass = QLabel("Contraseña:")
+        layout.addWidget(lbl_pass)
 
-        lnk = tk.Label(panel, text="¿Olvidaste tu contraseña?",
-                       font=FONT_LINK, fg=ACCENT2, bg=PANEL, cursor="hand2")
-        lnk.pack(anchor="e", pady=(0, 20))
-        lnk.bind("<Button-1>", lambda _: FormCambioPass(self.root))
+        self.e_pass = QLineEdit()
+        self.e_pass.setEchoMode(QLineEdit.EchoMode.Password)
+        self.e_pass.setPlaceholderText("Contraseña")
+        layout.addWidget(self.e_pass)
 
-        _mk_button(panel, "INGRESAR →",
-                   self._login).pack(fill="x", pady=(0, 14))
+        # Enlace "olvidé contraseña"
+        btn_forgot = QPushButton("¿Olvidaste tu contraseña?")
+        btn_forgot.setFlat(True)
+        btn_forgot.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_forgot.clicked.connect(self._abrir_cambio_pass)
+        layout.addWidget(btn_forgot, alignment=Qt.AlignmentFlag.AlignRight)
 
-        sep = tk.Frame(panel, bg=PANEL)
-        sep.pack(fill="x", pady=(0, 14))
-        tk.Frame(sep, bg=BORDER, height=1).pack(
-            side="left", fill="x", expand=True, pady=6)
-        tk.Label(sep, text="  o  ", fg=MUTED, bg=PANEL,
-                 font=FONT_LABEL).pack(side="left")
-        tk.Frame(sep, bg=BORDER, height=1).pack(
-            side="left", fill="x", expand=True, pady=6)
+        # Botón Ingresar
+        btn_login = QPushButton("Ingresar")
+        btn_login.clicked.connect(self._login)
+        btn_login.setDefault(True)
+        layout.addWidget(btn_login)
 
-        _mk_button(panel, "CREAR CUENTA",
-                   lambda: FormCrearUsuario(self.root),
-                   color=ENTRY_BG, fg=ACCENT).pack(fill="x")
+        # Botón Crear cuenta
+        btn_registro = QPushButton("Crear cuenta")
+        btn_registro.clicked.connect(self._abrir_registro)
+        layout.addWidget(btn_registro)
 
-        self.lbl_status = tk.Label(panel, text="", fg=ERROR, bg=PANEL,
-                                   font=FONT_LABEL, wraplength=300)
-        self.lbl_status.pack(pady=(14, 0))
+        # Etiqueta de estado
+        self.lbl_status = QLabel("")
+        self.lbl_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_status.setWordWrap(True)
+        layout.addWidget(self.lbl_status)
+
+        # Enter dispara login
+        self.e_pass.returnPressed.connect(self._login)
+
+    # ── Acciones ─────────────────────────────────────────────────────────
+
+    def _abrir_cambio_pass(self):
+        self._dlg_pass = FormCambioPass(self)
+        self._dlg_pass.show()
+
+    def _abrir_registro(self):
+        self._dlg_reg = FormCrearUsuario(self)
+        self._dlg_reg.show()
 
     def _login(self):
-        # Acepta nombre de usuario O correo electrónico
-        credencial = self.e_credencial.get().strip()
-        password   = self.e_pass.get()
+        credencial = self.e_credencial.text().strip()
+        password   = self.e_pass.text()
 
         ok, error, usuario, aviso = ClaseLogin.autenticar(credencial, password)
 
         if not ok:
-            self.lbl_status.config(text=f"✗  {error}", fg=ERROR)
+            self.lbl_status.setText(f"✗  {error}")
             return
 
         nombre = usuario["nombre_usuario"]
-        self.lbl_status.config(
-            text=f"✓  ¡Bienvenido, {nombre}!", fg=SUCCESS)
+        self.lbl_status.setText(f"✓  ¡Bienvenido, {nombre}!")
 
         if aviso:
-            messagebox.showwarning("Aviso", aviso, parent=self.root)
+            QMessageBox.warning(self, "Aviso", aviso)
 
         rol = usuario.get("rol", "lector")
-        self.root.after(600, lambda: self._abrir_catalogo(usuario, rol))
+        QTimer.singleShot(600, lambda: self._abrir_catalogo(usuario, rol))
 
     def _abrir_catalogo(self, usuario: dict, rol: str):
-        self.root.destroy()
-
-        from PyQt6.QtWidgets import QApplication
-        import sys
-
-        app = QApplication.instance() or QApplication(sys.argv)
-        app.setStyle("Fusion")
-
+        self.close()
         self._catalogo = CatalogoWindow(usuario=usuario, rol=rol)
         self._catalogo.show()
 
-        if __name__ == "__main__":
-            sys.exit(app.exec())
-        else:
-            app.exec()
-
 
 if __name__ == "__main__":
-    FormLogin()
+    app = QApplication.instance() or QApplication(sys.argv)
+    ventana = FormLogin()
+    ventana.show()
+    sys.exit(app.exec())

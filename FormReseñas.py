@@ -6,6 +6,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from ClaseReseña import Resena
+from Json import JsonManager
+from rutas import ruta_imagen
+
 
 class FormResenas(QWidget):
     def __init__(self, pelicula_id, usuario_id, clase_pelicula,
@@ -14,9 +17,10 @@ class FormResenas(QWidget):
         self.pelicula_id     = pelicula_id
         self.usuario_id      = usuario_id
         self.clase_pelicula  = clase_pelicula
-        self.clase_resena = Resena()
+        self.clase_resena    = Resena()
         self.titulo_pelicula = titulo_pelicula
-        self.pelicula_obj    = pelicula_obj  # objeto completo recibido desde el catálogo
+        self.pelicula_obj    = pelicula_obj
+        self.db              = JsonManager()
 
         self.setWindowTitle("Reseñas")
         self.resize(1100, 750)
@@ -79,8 +83,8 @@ class FormResenas(QWidget):
         layout_info.setSpacing(8)
 
         self.lbl_nombre    = QLabel(self.titulo_pelicula or "NOMBRE PELÍCULA")
-        self.lbl_promedio  = QLabel("RESEÑA AVERAGE")
-        self.lbl_etiquetas = QLabel("ETIQUETA AVERAGE")
+        self.lbl_promedio  = QLabel("Promedio: —")
+        self.lbl_etiquetas = QLabel("Etiquetas: —")
 
         layout_info.addWidget(self.lbl_nombre)
         layout_info.addWidget(self.lbl_promedio)
@@ -101,14 +105,10 @@ class FormResenas(QWidget):
         self._cargar_resenas()
 
     def _cargar_info_pelicula(self):
-        # Si hay un objeto pelicula directo (venimos desde el catálogo), lo usamos
-        if self.pelicula_obj and not self.clase_pelicula:
-            p = self.pelicula_obj
-            self.lbl_nombre.setText(getattr(p, "titulo", self.titulo_pelicula) or "Sin título")
-
+        # Poster
+        if self.pelicula_obj:
             import os
-            from PyQt6.QtGui import QPixmap
-            ruta_poster = getattr(p, "imagen", None)
+            ruta_poster = ruta_imagen(getattr(self.pelicula_obj, "imagen", None))
             if ruta_poster and os.path.exists(ruta_poster):
                 pixmap = QPixmap(ruta_poster)
                 if not pixmap.isNull():
@@ -117,53 +117,72 @@ class FormResenas(QWidget):
                                       Qt.AspectRatioMode.KeepAspectRatio,
                                       Qt.TransformationMode.SmoothTransformation)
                     )
+            titulo = getattr(self.pelicula_obj, "titulo", self.titulo_pelicula)
+            self.lbl_nombre.setText(titulo or "Sin título")
+
+        # Promedio desde el JSON (siempre actualizado)
+        self._actualizar_promedio_ui()
+
+    def _actualizar_promedio_ui(self):
+        """Lee el promedio directo del JSON y actualiza los labels."""
+        pelicula_data = self.db.obtener_pelicula_por_id(self.pelicula_id)
+
+        if not pelicula_data:
+            self.lbl_promedio.setText("Promedio: —")
+            self.lbl_etiquetas.setText("Etiquetas: —")
             return
 
-        # Fallback: sin capa intermedia, solo mostrar el título recibido
-        if not self.clase_pelicula:
-            self.lbl_nombre.setText(self.titulo_pelicula or "Sin título")
-            return
+        promedio = pelicula_data.get("promedio_calificacion")
+        if promedio is not None:
+            self.lbl_promedio.setText(f"Promedio: {promedio} / 5")
+        else:
+            self.lbl_promedio.setText("Promedio: sin reseñas aún")
 
-        info = self.clase_pelicula.obtener_info_pelicula(self.pelicula_id)
-        if not info:
-            return
+        # Etiquetas más frecuentes entre todas las reseñas de la película
+        resenas = self.db.obtener_resenas_por_pelicula(self.pelicula_id)
+        conteo = {}
+        for r in resenas:
+            for etiqueta in r.get("etiquetas_ia", []):
+                conteo[etiqueta] = conteo.get(etiqueta, 0) + 1
 
-        self.lbl_nombre.setText(info.get("titulo", "Sin título"))
-        self.lbl_promedio.setText(f"Valoración promedio: {info.get('promedio', 'N/A')} / 5")
-        self.lbl_etiquetas.setText(f"Etiquetas: {', '.join(info.get('etiquetas_frecuentes', []))}")
-
-        ruta_poster = info.get("poster", None)
-        if ruta_poster:
-            pixmap = QPixmap(ruta_poster)
-            if not pixmap.isNull():
-                self.lbl_poster.setPixmap(
-                    pixmap.scaled(190, 270, Qt.AspectRatioMode.KeepAspectRatio,
-                                  Qt.TransformationMode.SmoothTransformation)
-                )
+        if conteo:
+            top = sorted(conteo, key=conteo.get, reverse=True)[:3]
+            self.lbl_etiquetas.setText(f"Etiquetas: {', '.join(top)}")
+        else:
+            self.lbl_etiquetas.setText("Etiquetas: —")
 
     def _cargar_resenas(self):
+        # Limpiar tarjetas anteriores
         while self.layout_resenas.count():
             item = self.layout_resenas.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
+        # Actualizar promedio cada vez que se recargan las reseñas
+        self._actualizar_promedio_ui()
+
         if not self.clase_resena:
-            lbl_vacio = QLabel("Aún no hay reseñas para esta película.")
-            lbl_vacio.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.layout_resenas.addWidget(lbl_vacio)
+            self.layout_resenas.addWidget(
+                self._lbl_vacio("Aún no hay reseñas para esta película."))
             return
 
         resenas = self.clase_resena.obtener_resenas_pelicula(self.pelicula_id)
 
         if not resenas:
-            lbl_vacio = QLabel("Aún no hay reseñas para esta película.")
-            lbl_vacio.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.layout_resenas.addWidget(lbl_vacio)
+            self.layout_resenas.addWidget(
+                self._lbl_vacio("Aún no hay reseñas para esta película."))
             return
 
         for resena in resenas:
-            tarjeta = self._crear_tarjeta(resena)
-            self.layout_resenas.addWidget(tarjeta)
+            # Enriquecer con el nombre real del usuario
+            usuario = self.db.obtener_usuario_por_id(resena.get("usuario_id"))
+            resena["nombre_usuario"] = usuario["nombre_usuario"] if usuario else f"Usuario {resena.get('usuario_id', '?')}"
+            self.layout_resenas.addWidget(self._crear_tarjeta(resena))
+
+    def _lbl_vacio(self, texto: str) -> QLabel:
+        lbl = QLabel(texto)
+        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        return lbl
 
     # ─────────────────────────────────────────
     #  TARJETA DE RESEÑA
@@ -206,7 +225,7 @@ class FormResenas(QWidget):
         layout_etiquetas.addStretch()
         layout_tarjeta.addLayout(layout_etiquetas, stretch=2)
 
-        # ── Columna derecha: valoración + botón editar ──
+        # ── Columna derecha: valoración + botones ──
         layout_derecha = QVBoxLayout()
         layout_derecha.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -215,7 +234,7 @@ class FormResenas(QWidget):
         layout_derecha.addWidget(lbl_valoracion)
 
         if resena.get("usuario_id") == self.usuario_id:
-            btn_editar = QPushButton("✏ Editar")
+            btn_editar = QPushButton("Editar")
             btn_editar.setFixedHeight(28)
             btn_editar.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_editar.clicked.connect(
@@ -223,7 +242,7 @@ class FormResenas(QWidget):
             )
             layout_derecha.addWidget(btn_editar)
 
-            btn_eliminar = QPushButton("🗑 Eliminar")
+            btn_eliminar = QPushButton("Eliminar")
             btn_eliminar.setFixedHeight(28)
             btn_eliminar.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_eliminar.clicked.connect(
