@@ -29,11 +29,9 @@ class Resena:
 
     def _traducir_al_ingles(self, texto: str) -> str:
         try:
-            import anthropic
-            client = anthropic.Anthropic()
-            response = client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=2048,
+            import ollama
+            response = ollama.chat(
+                model="llama3.2",
                 messages=[{
                     "role": "user",
                     "content": (
@@ -43,7 +41,7 @@ class Resena:
                     )
                 }]
             )
-            traduccion = response.content[0].text.strip()
+            traduccion = response["message"]["content"].strip()
 
             # ── DEBUG ──────────────────────────────────────
             print("=" * 60)
@@ -57,7 +55,6 @@ class Resena:
         except Exception as e:
             print(f"[Aviso] Error al traducir: {e}")
             return texto
-
     # ─────────────────────────────────────────
     #  MÉTODO PRINCIPAL
     # ─────────────────────────────────────────
