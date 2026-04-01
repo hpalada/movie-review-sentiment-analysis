@@ -14,6 +14,7 @@ try:
 except ImportError:
     pass
 
+
 class FormLogin(QWidget):
     def __init__(self):
         super().__init__()
