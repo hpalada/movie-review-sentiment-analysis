@@ -542,7 +542,7 @@ class PeliculaUI(QDialog):
         if event.buttons() == Qt.MouseButton.LeftButton and hasattr(self, '_drag_pos'):
             self.move(event.globalPosition().toPoint() - self._drag_pos)
 
-    
+    def _precargar(self):     
         self.input_titulo.setText(self.pelicula.titulo or "")
         self.input_desc.setText(self.pelicula.descripcion or "")
         self.input_fecha.setText(self.pelicula.fecha or "")

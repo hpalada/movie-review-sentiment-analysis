@@ -1044,7 +1044,7 @@ class CatalogoWindow(QWidget):
     def _navigate_to_reviews(self, pelicula):
         self.open_reviews.emit(pelicula)
         try:
-            from FormResenas import FormResenas
+            from FormReseñas import FormResenas
             form = FormResenas(
                 pelicula_id     = getattr(pelicula, "id", None),
                 usuario_id      = self.usuario_id,
@@ -1087,7 +1087,7 @@ class CatalogoWindow(QWidget):
         self.btn_inicio.setIcon(_svg_icon(SVG_HOME, 15))
 
         try:
-            from FormResenas import FormResenas
+            from FormReseñas import FormResenas
             form = FormResenas(
                 pelicula_id     = None,
                 usuario_id      = self.usuario_id,
