@@ -152,7 +152,7 @@ class HiloAnalisis(QThread):
         if self.datos.get("es_edicion"):
             resultado = self.clase_resena.editar_resena(
                 resena_id   = self.datos["resena_id"],
-                usuario_id  = self.datos["usuario_id"],
+                usuario_id  = self.datos["usuario_id"],  # ya viene el uid correcto
                 nuevo_texto = self.datos["texto"],
                 idioma      = self.datos["idioma"]
             )
@@ -436,7 +436,6 @@ STYLE_DIVIDER_V = """
 
 
 def _lbl_con_icono(svg: str, texto: str, svg_size: int = 14) -> QWidget:
-    """Devuelve un QWidget horizontal con ícono SVG + texto."""
     w = QWidget()
     w.setStyleSheet("background: transparent;")
     lay = QHBoxLayout(w)
@@ -458,22 +457,15 @@ def _lbl_con_icono(svg: str, texto: str, svg_size: int = 14) -> QWidget:
 
 
 def _campo_con_icono(svg: str, svg_size: int = 15) -> QWidget:
-    """
-    Devuelve un QWidget que superpone un ícono SVG
-    a la izquierda de un QLineEdit de solo lectura.
-    Expone .line_edit para leer/escribir el valor.
-    """
     wrap = QWidget()
     wrap.setStyleSheet("background: transparent;")
     wrap.setFixedHeight(42)
 
-    # El QLineEdit ocupa todo el ancho del contenedor
     le = QLineEdit(wrap)
     le.setReadOnly(True)
     le.setStyleSheet(STYLE_INPUT_READONLY)
     le.setFixedHeight(42)
 
-    # Ícono flotante, transparente a eventos de ratón
     ico = QLabel(wrap)
     ico.setPixmap(_svg_pixmap(svg, svg_size))
     ico.setFixedSize(svg_size, svg_size)
@@ -482,9 +474,8 @@ def _campo_con_icono(svg: str, svg_size: int = 15) -> QWidget:
     ico.setStyleSheet("background: transparent;")
     ico.raise_()
 
-    wrap.line_edit = le  # acceso público
+    wrap.line_edit = le
 
-    # Ajustar ancho cuando el contenedor cambia de tamaño
     original_resize = wrap.resizeEvent
     def _on_resize(e):
         le.setFixedWidth(wrap.width())
@@ -498,7 +489,7 @@ class FormAgregaryEditar(QWidget):
 
     def __init__(self, pelicula_id: int, usuario_id: int,
                  clase_resena, titulo_pelicula: str,
-                 resena: dict = None, callback=None):
+                 resena: dict = None, callback=None, es_admin: bool = False):
         super().__init__()
         self.pelicula_id     = pelicula_id
         self.usuario_id      = usuario_id
@@ -507,6 +498,7 @@ class FormAgregaryEditar(QWidget):
         self.resena          = resena
         self.callback        = callback
         self.es_edicion      = resena is not None
+        self.es_admin        = es_admin   # ← flag de admin recibido desde FormResenas
 
         self._configurar_ventana()
         self._construir_ui()
@@ -514,7 +506,7 @@ class FormAgregaryEditar(QWidget):
         if self.es_edicion:
             self._precargar_texto()
 
-    # ── CONFIGURACIÓN DE VENTANA 
+    # ── CONFIGURACIÓN DE VENTANA
     def _configurar_ventana(self):
         self.setWindowTitle("Editar reseña" if self.es_edicion else "Agregar reseña")
         self.setFixedSize(780, 480)
@@ -526,7 +518,7 @@ class FormAgregaryEditar(QWidget):
         )
         self.setStyleSheet(STYLE_MAIN)
 
-    # ── CONSTRUCCIÓN DE LA UI 
+    # ── CONSTRUCCIÓN DE LA UI
 
     def _construir_ui(self):
         raiz = QHBoxLayout(self)
@@ -535,7 +527,7 @@ class FormAgregaryEditar(QWidget):
         raiz.addWidget(self._card_formulario(), stretch=3)
         raiz.addWidget(self._card_resultados(), stretch=2)
 
-    # ── CARD IZQUIERDA: FORMULARIO 
+    # ── CARD IZQUIERDA: FORMULARIO
 
     def _card_formulario(self) -> QFrame:
         card = QFrame()
@@ -581,7 +573,6 @@ class FormAgregaryEditar(QWidget):
         self._wrap_pelicula = _campo_con_icono(SVG_FILM, svg_size=14)
         self._wrap_pelicula.line_edit.setText(self.titulo_pelicula)
         self._wrap_pelicula.line_edit.setPlaceholderText("Nombre película")
-        # Alias para compatibilidad con código externo que pudiera usar campo_pelicula
         self.campo_pelicula = self._wrap_pelicula.line_edit
         layout.addWidget(self._wrap_pelicula)
         layout.addSpacing(14)
@@ -604,7 +595,6 @@ class FormAgregaryEditar(QWidget):
         fila_bottom.setSpacing(8)
         fila_bottom.setContentsMargins(0, 0, 0, 0)
 
-        # Ícono globo (idioma) con SVG
         ico_globe = QLabel()
         ico_globe.setPixmap(_svg_pixmap(SVG_GLOBE, 14))
         ico_globe.setFixedSize(14, 14)
@@ -620,7 +610,6 @@ class FormAgregaryEditar(QWidget):
         fila_bottom.addWidget(self.switch_idioma)
         fila_bottom.addStretch()
 
-        # Botón "Analizar con IA" con ícono SVG estrella
         self.btn_analizar = QPushButton("  Analizar con IA")
         self.btn_analizar.setFixedHeight(44)
         self.btn_analizar.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -634,7 +623,7 @@ class FormAgregaryEditar(QWidget):
 
         return card
 
-    # ── CARD DERECHA: RESULTADOS ─────────────────────────────
+    # ── CARD DERECHA: RESULTADOS
 
     def _card_resultados(self) -> QFrame:
         card = QFrame()
@@ -644,7 +633,6 @@ class FormAgregaryEditar(QWidget):
         layout.setContentsMargins(24, 22, 24, 22)
         layout.setSpacing(0)
 
-        # Encabezado con ícono SVG chip/IA
         fila_titulo = QHBoxLayout()
         fila_titulo.setSpacing(8)
         fila_titulo.setContentsMargins(0, 0, 0, 0)
@@ -668,26 +656,22 @@ class FormAgregaryEditar(QWidget):
         layout.addWidget(lbl_sub)
         layout.addSpacing(20)
 
-        # Label puntuación
         lbl_puntuacion = QLabel("PUNTUACIÓN IA")
         lbl_puntuacion.setStyleSheet(STYLE_LABEL_SECTION)
         lbl_puntuacion.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(lbl_puntuacion)
         layout.addSpacing(10)
 
-        # Círculo de puntuación
         self.circulo = CircularScore()
         layout.addWidget(self.circulo, alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addSpacing(18)
 
-        # Label etiquetas
         lbl_etiq_titulo = QLabel("ETIQUETAS DETECTADAS")
         lbl_etiq_titulo.setStyleSheet(STYLE_LABEL_SECTION)
         lbl_etiq_titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(lbl_etiq_titulo)
         layout.addSpacing(8)
 
-        # Estado pendiente con ícono reloj de arena
         self._fila_estado = QHBoxLayout()
         self._fila_estado.setSpacing(6)
         self._fila_estado.setContentsMargins(0, 0, 0, 0)
@@ -710,7 +694,6 @@ class FormAgregaryEditar(QWidget):
         estado_wrap.setLayout(self._fila_estado)
         layout.addWidget(estado_wrap, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Contenedor chips
         self.widget_chips = QWidget()
         self.widget_chips.setStyleSheet("background: transparent;")
         self.layout_chips = QHBoxLayout(self.widget_chips)
@@ -721,7 +704,6 @@ class FormAgregaryEditar(QWidget):
 
         layout.addStretch()
 
-        # Botón guardar con ícono SVG disco/save
         self.btn_cerrar = QPushButton("  Guardar reseña")
         self.btn_cerrar.setFixedHeight(44)
         self.btn_cerrar.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -734,12 +716,12 @@ class FormAgregaryEditar(QWidget):
 
         return card
 
-    # ── PRECARGA EN MODO EDICIÓN ─────────────────────────────
+    # ── PRECARGA EN MODO EDICIÓN
 
     def _precargar_texto(self):
         self.campo_resena.setPlainText(self.resena.get("texto", ""))
 
-    # ── GUARDAR / ANALIZAR ───────────────────────────────────
+    # ── GUARDAR / ANALIZAR
 
     def _guardar(self):
         texto = self.campo_resena.toPlainText().strip()
@@ -756,7 +738,6 @@ class FormAgregaryEditar(QWidget):
         self.campo_resena.setReadOnly(True)
         self.switch_idioma.btn.setEnabled(False)
 
-        # Estado "Analizando..." con ícono reloj
         self.ico_estado.setPixmap(_svg_pixmap(SVG_CLOCK, 13))
         self.lbl_estado.setText("Analizando...")
         self.lbl_estado.setStyleSheet(STYLE_ESTADO_LABEL)
@@ -766,9 +747,16 @@ class FormAgregaryEditar(QWidget):
         self._limpiar_chips()
         self.circulo.set_valor(None)
 
+        # ── Si es admin editando una reseña ajena, usar el usuario_id del dueño
+        # para que JsonManager.editar_resena pase su validación sin modificarlo
+        if self.es_edicion and self.es_admin:
+            uid_para_editar = self.resena["usuario_id"]
+        else:
+            uid_para_editar = self.usuario_id
+
         datos = {
             "es_edicion"     : self.es_edicion,
-            "usuario_id"     : self.usuario_id,
+            "usuario_id"     : uid_para_editar,
             "titulo_pelicula": self.titulo_pelicula,
             "texto"          : texto,
             "resena_id"      : self.resena["id"] if self.es_edicion else None,
@@ -778,7 +766,7 @@ class FormAgregaryEditar(QWidget):
         self.hilo.resultado_listo.connect(self._mostrar_resultados)
         self.hilo.start()
 
-    # ── MOSTRAR RESULTADOS ───────────────────────────────────
+    # ── MOSTRAR RESULTADOS
 
     def _mostrar_resultados(self, resultado: dict):
         self.switch_idioma.btn.setEnabled(True)
@@ -794,16 +782,13 @@ class FormAgregaryEditar(QWidget):
             self.campo_resena.setReadOnly(False)
             return
 
-        # Puntuación
         self.circulo.set_valor(resultado.get("valoracion"))
 
-        # Ocultar estado y mostrar chips
         self.lbl_estado.hide()
         self.ico_estado.hide()
         self._limpiar_chips()
 
         for etiqueta in resultado.get("etiquetas", []):
-            # Chip con ícono tag + texto
             chip_w = QWidget()
             chip_w.setStyleSheet(
                 "background-color: #F3F4F6; border-radius: 6px;"
@@ -827,23 +812,22 @@ class FormAgregaryEditar(QWidget):
             chip_lay.addWidget(ico_tag)
             chip_lay.addWidget(lbl_chip)
 
-            # Insertar antes del stretch final
             self.layout_chips.insertWidget(self.layout_chips.count() - 1, chip_w)
 
         self.btn_cerrar.setEnabled(True)
         self.btn_analizar.setEnabled(False)
 
-    #CERRAR
+    # ── CERRAR
 
     def _cerrar(self):
         if self.callback:
             self.callback()
         self.close()
 
-    #LIMPIAR CHIPS 
+    # ── LIMPIAR CHIPS
 
     def _limpiar_chips(self):
-        while self.layout_chips.count() > 1:   # conservar stretch final
+        while self.layout_chips.count() > 1:
             item = self.layout_chips.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()

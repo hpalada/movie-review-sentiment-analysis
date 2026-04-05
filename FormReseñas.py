@@ -328,10 +328,6 @@ def _svg_widget(svg_bytes: bytes, size: int) -> QSvgWidget:
 
 
 def _estrellas_widget(valoracion, maximo: int = 5) -> QWidget:
-    """
-    Devuelve un QWidget con estrellas SVG coloreadas según la valoración.
-    Soporta valores sobre 5 (escala de la IA).
-    """
     contenedor = QWidget()
     contenedor.setStyleSheet("background: transparent;")
     fila = QHBoxLayout(contenedor)
@@ -343,7 +339,6 @@ def _estrellas_widget(valoracion, maximo: int = 5) -> QWidget:
     except (ValueError, TypeError):
         val = 0
 
-    # Normalizar a escala /5
     val_norm = min(val, maximo) / maximo * 5
 
     for i in range(5):
@@ -378,6 +373,13 @@ class FormResenas(QWidget):
         self.titulo_pelicula = titulo_pelicula
         self.pelicula_obj    = pelicula_obj
         self.db              = JsonManager()
+
+        # ── Detectar si el usuario actual es administrador ──
+        usuario_actual = self.db.obtener_usuario_por_id(usuario_id)
+        self.es_admin = (
+            usuario_actual.get("rol", "").lower() == "admin"
+            if usuario_actual else False
+        )
 
         self.setWindowTitle("Reseñas")
         self.resize(1100, 750)
@@ -439,7 +441,6 @@ class FormResenas(QWidget):
         layout_raiz.addWidget(self.btn_agregar)
 
     def _pixmap_from_svg(self, svg_bytes: bytes, size: int) -> QPixmap:
-        """Convierte bytes SVG en QPixmap para usar como QIcon."""
         from PyQt6.QtSvg import QSvgRenderer
         from PyQt6.QtGui import QPainter
         renderer = QSvgRenderer(QByteArray(svg_bytes))
@@ -540,7 +541,6 @@ class FormResenas(QWidget):
         self._actualizar_promedio_ui()
 
     def _actualizar_promedio_ui(self):
-        """Lee el promedio del JSON y actualiza estrellas + chips de etiquetas."""
         pelicula_data = self.db.obtener_pelicula_por_id(self.pelicula_id)
 
         if not pelicula_data:
@@ -551,7 +551,6 @@ class FormResenas(QWidget):
 
         if promedio is not None:
             self.lbl_promedio_num.setText(str(promedio))
-            # Reconstruir widget de estrellas
             old = self.widget_estrellas
             self.widget_estrellas = _estrellas_widget(promedio, maximo=5)
             layout_info = old.parent().layout() if old.parent() else None
@@ -719,7 +718,8 @@ class FormResenas(QWidget):
         col_derecha.addWidget(lbl_sobre)
         col_derecha.addStretch()
 
-        if resena.get("usuario_id") == self.usuario_id:
+        # ── Mostrar botones si es el dueño de la reseña O si es admin ──
+        if resena.get("usuario_id") == self.usuario_id or self.es_admin:
             btn_editar = QPushButton("  Editar")
             btn_editar.setFixedHeight(30)
             btn_editar.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -764,7 +764,8 @@ class FormResenas(QWidget):
             clase_resena    = self.clase_resena,
             titulo_pelicula = self.titulo_pelicula,
             resena          = resena,
-            callback        = self._cargar_resenas
+            callback        = self._cargar_resenas,
+            es_admin        = self.es_admin        # ← pasa el flag al formulario
         )
         self.form_ae.show()
 
@@ -779,9 +780,12 @@ class FormResenas(QWidget):
         )
 
         if confirmacion == QMessageBox.StandardButton.Yes:
+            # Si es admin elimina usando el usuario_id del dueño de la reseña
+            # para pasar la validación del JSON sin modificarlo
+            uid_eliminar = resena.get("usuario_id") if self.es_admin else self.usuario_id
             resultado = self.clase_resena.eliminar_resena(
                 resena_id  = resena["id"],
-                usuario_id = self.usuario_id
+                usuario_id = uid_eliminar
             )
             if resultado["exito"]:
                 self._cargar_resenas()

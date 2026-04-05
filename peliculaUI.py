@@ -1,4 +1,3 @@
-
 import os
 import shutil
 from PyQt6.QtWidgets import (
@@ -7,15 +6,14 @@ from PyQt6.QtWidgets import (
     QGraphicsDropShadowEffect, QScrollArea, QWidget
 )
 from PyQt6.QtGui import QPixmap, QColor
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
+from PyQt6.QtCore import Qt
 from clasePelicula import Pelicula
 
-#Rutas base
+# Rutas base
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 CARPETA_IMGS = os.path.join(BASE_DIR, "Imagenes")
 
 def _ruta_completa(nombre_archivo: str) -> str:
-    """Dado el nombre guardado en el JSON, devuelve la ruta absoluta real."""
     if not nombre_archivo:
         return ""
     if os.path.isabs(nombre_archivo):
@@ -23,7 +21,14 @@ def _ruta_completa(nombre_archivo: str) -> str:
     return os.path.join(CARPETA_IMGS, nombre_archivo)
 
 
-#Estilos
+# Estilos
+STYLE_MAIN = """
+    QWidget {
+        background-color: #F7F8FA;
+        font-family: 'Segoe UI', sans-serif;
+    }
+"""
+
 STYLE_LABEL_SECTION = """
     QLabel {
         color: #6B7280;
@@ -132,30 +137,6 @@ STYLE_IMAGE_CONTAINER = """
     }
 """
 
-STYLE_HEADER_LABEL = """
-    QLabel {
-        color: #111827;
-        font-size: 17px;
-        font-weight: 700;
-        font-family: 'Segoe UI', sans-serif;
-        background: transparent;
-        padding: 0px;
-        margin: 0px;
-    }
-"""
-
-STYLE_SUBTITLE_LABEL = """
-    QLabel {
-        color: #9CA3AF;
-        font-size: 12px;
-        font-weight: 400;
-        font-family: 'Segoe UI', sans-serif;
-        background: transparent;
-        padding: 0px;
-        margin: 0px;
-    }
-"""
-
 STYLE_DIVIDER = """
     QFrame {
         background-color: #E5E7EB;
@@ -225,14 +206,10 @@ STYLE_MSGBOX = """
 
 
 def _agregar_campo(parent_layout: QVBoxLayout, etiqueta: str, placeholder: str) -> QLineEdit:
-    """
-    Añade etiqueta + input al layout con espaciado consistente.
-    Retorna el QLineEdit creado.
-    """
     lbl = QLabel(etiqueta)
     lbl.setStyleSheet(STYLE_LABEL_SECTION)
     parent_layout.addWidget(lbl)
-    parent_layout.addSpacing(7)          
+    parent_layout.addSpacing(7)
 
     inp = QLineEdit()
     inp.setPlaceholderText(placeholder)
@@ -243,12 +220,6 @@ def _agregar_campo(parent_layout: QVBoxLayout, etiqueta: str, placeholder: str) 
 
 
 class PeliculaUI(QDialog):
-    """
-    Diálogo para agregar o editar una película.
-    - pelicula=None  → modo agregar
-    - pelicula=obj   → modo editar (precarga los campos)
-    - callback       → función que se llama al guardar para refrescar el catálogo
-    """
     def __init__(self, pelicula=None, callback=None, parent=None):
         super().__init__(parent)
         self.pelicula   = pelicula
@@ -257,14 +228,15 @@ class PeliculaUI(QDialog):
         self._ruta_imagen_original = None
 
         self.setWindowTitle("Editar película" if self.es_edicion else "Agregar película")
-        self.setFixedSize(820, 560)
+        self.setFixedSize(820, 520)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
-
+        # Barra nativa de Windows igual que los demás formularios
         self.setWindowFlags(
-            Qt.WindowType.Dialog |
-            Qt.WindowType.FramelessWindowHint
+            Qt.WindowType.Window |
+            Qt.WindowType.WindowTitleHint |
+            Qt.WindowType.WindowCloseButtonHint
         )
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setStyleSheet(STYLE_MAIN)
 
         os.makedirs(CARPETA_IMGS, exist_ok=True)
         self._construir_ui()
@@ -272,99 +244,51 @@ class PeliculaUI(QDialog):
         if self.es_edicion:
             self._precargar()
 
-        self._animar_entrada()
-
-    def _animar_entrada(self):
-        anim = QPropertyAnimation(self, b"windowOpacity")
-        anim.setDuration(220)
-        anim.setStartValue(0.0)
-        anim.setEndValue(1.0)
-        anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-        anim.start()
-        self._anim = anim
-
     def _construir_ui(self):
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(14, 14, 14, 14)
-        outer.setSpacing(0)
+        root = QVBoxLayout(self)
+        # HEADER INTERNO (como tu diseño)
+        header = QWidget()
+        header.setStyleSheet("background: transparent;")
 
-        #Card principal
-        self.card = QFrame()
-        self.card.setObjectName("mainCard")
-        self.card.setStyleSheet("""
-            QFrame#mainCard {
-                background-color: #F7F8FA;
-                border-radius: 18px;
-                border: 1px solid #E5E7EB;
-            }
+        header_layout = QVBoxLayout(header)
+        header_layout.setContentsMargins(32, 20, 32, 10)
+        header_layout.setSpacing(4)
+
+        lbl_title = QLabel("Agregar película" if not self.es_edicion else "Editar película")
+        lbl_title.setStyleSheet("""
+            color: #111827;
+            font-size: 20px;
+            font-weight: 700;
+            font-family: 'Segoe UI', sans-serif;
         """)
-        sombra = QGraphicsDropShadowEffect()
-        sombra.setBlurRadius(40)
-        sombra.setOffset(0, 8)
-        sombra.setColor(QColor(0, 0, 0, 45))
-        self.card.setGraphicsEffect(sombra)
-        outer.addWidget(self.card)
 
-        root = QVBoxLayout(self.card)
+        lbl_sub = QLabel(
+            "Completa la información de la película"
+            if not self.es_edicion else
+            "Modifica los datos de la película"
+        )
+        lbl_sub.setStyleSheet("""
+            color: #9CA3AF;
+            font-size: 12px;
+            font-family: 'Segoe UI', sans-serif;
+        """)
+
+        header_layout.addWidget(lbl_title)
+        header_layout.addWidget(lbl_sub)
+        
+        root.addWidget(header)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
-
-        #Barra de título
-        title_bar = QWidget()
-        title_bar.setStyleSheet("background: transparent;")
-        tb_layout = QHBoxLayout(title_bar)
-        # padding generoso: 32px laterales, 20px arriba y abajo
-        tb_layout.setContentsMargins(32, 20, 24, 20)
-        tb_layout.setSpacing(0)
-
-        text_v = QVBoxLayout()
-        text_v.setSpacing(4)
-        lbl_title = QLabel("Editar película" if self.es_edicion else "Agregar película")
-        lbl_title.setStyleSheet(STYLE_HEADER_LABEL)
-        lbl_sub = QLabel(
-            "Modifica los datos de la película" if self.es_edicion
-            else "Completa la información de la película"
-        )
-        lbl_sub.setStyleSheet(STYLE_SUBTITLE_LABEL)
-        text_v.addWidget(lbl_title)
-        text_v.addWidget(lbl_sub)
-
-        btn_close = QPushButton("✕")
-        btn_close.setFixedSize(32, 32)
-        btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_close.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: #9CA3AF;
-                border: none;
-                border-radius: 8px;
-                font-size: 13px;
-                font-weight: 700;
-            }
-            QPushButton:hover {
-                background: #EBEBEB;
-                color: #374151;
-            }
-        """)
-        btn_close.clicked.connect(self.close)
-
-        tb_layout.addLayout(text_v)
-        tb_layout.addStretch()
-        tb_layout.addWidget(btn_close, alignment=Qt.AlignmentFlag.AlignVCenter)
-        root.addWidget(title_bar)
-
-        # Divisor bajo título
-        div_top = QFrame()
-        div_top.setFrameShape(QFrame.Shape.HLine)
-        div_top.setStyleSheet(STYLE_DIVIDER)
-        root.addWidget(div_top)
-
-        #Cuerpo: columna izquierda + derecha 
+        div = QFrame()
+        div.setFrameShape(QFrame.Shape.HLine)
+        div.setStyleSheet("background-color: #E5E7EB; max-height: 1px;")
+        root.addWidget(div)
+        # Cuerpo: columna izquierda + derecha
         body = QHBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(0)
 
-        #COLUMNA IZQUIERDA
+        # COLUMNA IZQUIERDA
         left_scroll = QScrollArea()
         left_scroll.setWidgetResizable(True)
         left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -374,15 +298,12 @@ class PeliculaUI(QDialog):
         left_widget = QWidget()
         left_widget.setStyleSheet("background: transparent;")
         left_layout = QVBoxLayout(left_widget)
-        # margen interno de la columna: 32px laterales, 28px vertical
         left_layout.setContentsMargins(32, 28, 28, 28)
         left_layout.setSpacing(0)
 
-        # Título
         self.input_titulo = _agregar_campo(left_layout, "TÍTULO", "Nombre de la pelicula")
-        left_layout.addSpacing(18)   # separación entre grupos de campos
+        left_layout.addSpacing(18)
 
-        # Año + Director en fila
         row1 = QHBoxLayout()
         row1.setSpacing(14)
 
@@ -393,7 +314,6 @@ class PeliculaUI(QDialog):
         col_anio.addWidget(lbl_anio)
         col_anio.addSpacing(7)
         self.input_anio = QLineEdit()
-        self.input_anio.setPlaceholderText
         self.input_anio.setStyleSheet(STYLE_INPUT)
         self.input_anio.setFixedHeight(42)
         col_anio.addWidget(self.input_anio)
@@ -405,7 +325,6 @@ class PeliculaUI(QDialog):
         col_dir.addWidget(lbl_dir)
         col_dir.addSpacing(7)
         self.input_director = QLineEdit()
-        self.input_director.setPlaceholderText
         self.input_director.setStyleSheet(STYLE_INPUT)
         self.input_director.setFixedHeight(42)
         col_dir.addWidget(self.input_director)
@@ -415,11 +334,9 @@ class PeliculaUI(QDialog):
         left_layout.addLayout(row1)
         left_layout.addSpacing(18)
 
-        # Fecha
         self.input_fecha = _agregar_campo(left_layout, "FECHA DE PUBLICACIÓN", "Ejemplo: 2024-05-17")
         left_layout.addSpacing(18)
 
-        # Descripción
         self.input_desc = _agregar_campo(left_layout, "DESCRIPCIÓN", "Breve sinopsis de la película...")
         left_layout.addStretch()
 
@@ -432,23 +349,21 @@ class PeliculaUI(QDialog):
         div_v.setStyleSheet(STYLE_DIVIDER_V)
         body.addWidget(div_v)
 
-        #COLUMNA DERECHA
+        # COLUMNA DERECHA
         right_widget = QWidget()
         right_widget.setStyleSheet("background: transparent;")
         right_layout = QVBoxLayout(right_widget)
-        # mismo margen interno que la izquierda
         right_layout.setContentsMargins(28, 28, 32, 28)
         right_layout.setSpacing(0)
 
         lbl_img_sec = QLabel("IMAGEN DE PORTADA")
         lbl_img_sec.setStyleSheet(STYLE_LABEL_SECTION)
         right_layout.addWidget(lbl_img_sec)
-        right_layout.addSpacing(7)   # etiqueta → fila de controles
+        right_layout.addSpacing(7)
 
         img_row = QHBoxLayout()
         img_row.setSpacing(8)
 
-# INPUT IMAGEN 
         self.input_imagen = QLineEdit()
         self.input_imagen.setPlaceholderText("Selecciona una imagen")
         self.input_imagen.setReadOnly(True)
@@ -456,27 +371,25 @@ class PeliculaUI(QDialog):
         self.input_imagen.setFixedHeight(42)
         self.input_imagen.setMinimumWidth(150)
 
-        # BOTÓN QUITAR
         btn_remove = QPushButton("✕")
         btn_remove.setFixedSize(28, 28)
         btn_remove.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_remove.setStyleSheet("""
-        QPushButton {
-            background: transparent;
-            color: #FF0000;
-            border: none;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 700;
-        }
-        QPushButton:hover {
-            background: #FF0000;
-            color: #FFFFFF;
-        }
+            QPushButton {
+                background: transparent;
+                color: #FF0000;
+                border: none;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                background: #FF0000;
+                color: #FFFFFF;
+            }
         """)
         btn_remove.clicked.connect(self._quitar_imagen)
 
-        # BOTÓN EXPLORAR
         btn_img = QPushButton("＋ Explorar")
         btn_img.setFixedHeight(42)
         btn_img.setFixedWidth(100)
@@ -484,13 +397,13 @@ class PeliculaUI(QDialog):
         btn_img.setStyleSheet(STYLE_BTN_IMG)
         btn_img.clicked.connect(self._seleccionar_imagen)
 
-        # ORDEN CORRECTO
         img_row.addWidget(btn_remove)
         img_row.addWidget(self.input_imagen, 1)
         img_row.addWidget(btn_img)
 
         right_layout.addLayout(img_row)
         right_layout.addSpacing(18)
+
         self.label_imagen = QLabel("Sin imagen\nseleccionada")
         self.label_imagen.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label_imagen.setStyleSheet(STYLE_IMAGE_CONTAINER)
@@ -500,7 +413,7 @@ class PeliculaUI(QDialog):
         body.addWidget(right_widget, stretch=1)
         root.addLayout(body, stretch=1)
 
-        #Footer con botones 
+        # Footer con botones
         div_bot = QFrame()
         div_bot.setFrameShape(QFrame.Shape.HLine)
         div_bot.setStyleSheet(STYLE_DIVIDER)
@@ -533,16 +446,7 @@ class PeliculaUI(QDialog):
         foot_layout.addWidget(self.btn_guardar)
         root.addWidget(footer)
 
-    
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-
-    def mouseMoveEvent(self, event):
-        if event.buttons() == Qt.MouseButton.LeftButton and hasattr(self, '_drag_pos'):
-            self.move(event.globalPosition().toPoint() - self._drag_pos)
-
-    def _precargar(self):     
+    def _precargar(self):
         self.input_titulo.setText(self.pelicula.titulo or "")
         self.input_desc.setText(self.pelicula.descripcion or "")
         self.input_fecha.setText(self.pelicula.fecha or "")
@@ -563,15 +467,14 @@ class PeliculaUI(QDialog):
             self._ruta_imagen_original = ruta
             self.input_imagen.setText(os.path.basename(ruta))
             self._mostrar_imagen(ruta)
+
     def _quitar_imagen(self):
         self._ruta_imagen_original = None
         self.input_imagen.clear()
-
         self.label_imagen.clear()
         self.label_imagen.setText("Sin imagen\nseleccionada")
-
-        #restaurar estilo original
         self.label_imagen.setStyleSheet(STYLE_IMAGE_CONTAINER)
+
     def _mostrar_imagen(self, ruta_absoluta: str):
         if ruta_absoluta and os.path.exists(ruta_absoluta):
             px = QPixmap(ruta_absoluta)
@@ -597,11 +500,6 @@ class PeliculaUI(QDialog):
         self.label_imagen.setStyleSheet(STYLE_IMAGE_CONTAINER)
 
     def _copiar_imagen(self, ruta_origen: str) -> str:
-        """
-        Copia la imagen a la carpeta Imagenes/ del proyecto.
-        Devuelve el nombre del archivo (lo que se guarda en el JSON).
-        Si el archivo ya está en Imagenes/, no lo copia de nuevo.
-        """
         nombre  = os.path.basename(ruta_origen)
         destino = os.path.join(CARPETA_IMGS, nombre)
         if os.path.abspath(ruta_origen) != os.path.abspath(destino):
@@ -631,12 +529,9 @@ class PeliculaUI(QDialog):
         anio_txt    = self.input_anio.text().strip()
         anio        = int(anio_txt) if anio_txt.isdigit() else None
 
-        # ── Manejar imagen ────────────────────────────────────────────
         if self._ruta_imagen_original:
-            
             imagen = self._copiar_imagen(self._ruta_imagen_original)
         elif self.es_edicion:
-            
             imagen = self.pelicula.imagen
         else:
             imagen = None

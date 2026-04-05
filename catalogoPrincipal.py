@@ -1,12 +1,12 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QScrollArea, QFrame, QGridLayout, QSizePolicy,
-    QMessageBox, QApplication, QGraphicsDropShadowEffect
+    QMessageBox, QApplication, QGraphicsDropShadowEffect,
+    QStackedWidget
 )
-from PyQt6.QtGui import QPixmap, QCursor, QColor, QIcon, QPainter, QPainterPath
+from PyQt6.QtGui import QPixmap, QCursor, QColor, QIcon, QPainter
 from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtSvg import QSvgRenderer
-from PyQt6.QtGui import QPixmap, QPainter
 
 import os
 import sys
@@ -16,10 +16,9 @@ from rutas import ruta_imagen
 
 try:
     from clasePelicula import Pelicula
-    def _get_all():  return Pelicula.todas()
+    def _get_all(): return Pelicula.todas()
     def _search(q):
-        return [p for p in Pelicula.todas()
-                if q.lower() in p.titulo.lower()]
+        return [p for p in Pelicula.todas() if q.lower() in p.titulo.lower()]
     def _del(p): p.eliminar()
     USE_MODEL = True
 except ImportError:
@@ -38,7 +37,7 @@ except ImportError:
 
 
 
-# ICONOS SVG INLINE
+# SVG HELPERS
 
 
 def _svg_pixmap_at_scale(svg_str: str, size: int, scale: int) -> QPixmap:
@@ -53,7 +52,6 @@ def _svg_pixmap_at_scale(svg_str: str, size: int, scale: int) -> QPixmap:
     painter.end()
     px.setDevicePixelRatio(float(scale))
     return px
-
 
 def _svg_pixmap(svg_str: str, size: int = 18) -> QPixmap:
     app = QApplication.instance()
@@ -70,14 +68,15 @@ def _svg_pixmap(svg_str: str, size: int = 18) -> QPixmap:
     px.setDevicePixelRatio(dpr)
     return px
 
-
 def _svg_icon(svg_str: str, size: int = 18) -> QIcon:
     icon = QIcon()
-    px1 = _svg_pixmap_at_scale(svg_str, size, scale=1)
-    icon.addPixmap(px1, QIcon.Mode.Normal, QIcon.State.Off)
-    px2 = _svg_pixmap_at_scale(svg_str, size, scale=2)
-    icon.addPixmap(px2, QIcon.Mode.Normal, QIcon.State.Off)
+    for scale in (1, 2):
+        px = _svg_pixmap_at_scale(svg_str, size, scale)
+        icon.addPixmap(px, QIcon.Mode.Normal, QIcon.State.Off)
     return icon
+
+
+# SVG ICONS
 
 
 SVG_HOME = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
@@ -104,14 +103,12 @@ SVG_STAR_ACTIVE = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                    12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
 </svg>"""
 
-#  stroke visible en gris oscuro 
 SVG_SEARCH = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
   stroke="#6B7280" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
   <circle cx="11" cy="11" r="8"/>
   <line x1="21" y1="21" x2="16.65" y2="16.65"/>
 </svg>"""
 
-# variantes inactivo / activo (blanco) para grid y lista
 SVG_GRID = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
   stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
   <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
@@ -166,6 +163,21 @@ SVG_TRASH = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill=
   <path d="M9 6V4h6v2"/>
 </svg>"""
 
+SVG_ARROW_LEFT = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+  stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <line x1="19" y1="12" x2="5" y2="12"/>
+  <polyline points="12 19 5 12 12 5"/>
+</svg>"""
+
+SVG_FILM = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+  stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="2" y="2" width="20" height="20" rx="2"/>
+  <line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/>
+  <line x1="2" y1="12" x2="22" y2="12"/>
+  <line x1="2" y1="7" x2="7" y2="7"/><line x1="17" y1="7" x2="22" y2="7"/>
+  <line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/>
+</svg>"""
+
 
 
 # ESTILOS
@@ -212,9 +224,7 @@ STYLE_SEARCH = """
 
 STYLE_SCROLL = """
     QScrollArea { border: none; background: transparent; }
-    QScrollBar:vertical {
-        background: transparent; width: 5px;
-    }
+    QScrollBar:vertical { background: transparent; width: 5px; }
     QScrollBar::handle:vertical {
         background: #D1D5DB; border-radius: 3px; min-height: 20px;
     }
@@ -381,7 +391,24 @@ STYLE_MSGBOX = """
     QMessageBox QPushButton:hover { background-color: #1F2937; }
 """
 
-
+STYLE_BTN_BACK = """
+    QPushButton {
+        background: transparent;
+        color: #6B7280;
+        border: none;
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 500;
+        font-family: 'Segoe UI', sans-serif;
+        text-align: left;
+    }
+    QPushButton:hover {
+        background-color: #F3F4F6;
+        color: #111827;
+    }
+    QPushButton:pressed { background-color: #E5E7EB; }
+"""
 
 # HELPERS
 
@@ -412,8 +439,8 @@ def _cargar_px(pelicula, w, h):
     return None
 
 
-# TARJETA DE PELICULA (grid)
 
+# MOVIE CARD (grid)
 
 class MovieCard(QFrame):
     explore_clicked = pyqtSignal(object)
@@ -437,7 +464,6 @@ class MovieCard(QFrame):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # Poster
         img = QLabel()
         img.setFixedSize(220, 200)
         img.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -446,9 +472,7 @@ class MovieCard(QFrame):
                 background-color: #F3F4F6;
                 border-top-left-radius: 14px;
                 border-top-right-radius: 14px;
-                color: #9CA3AF;
-                font-size: 18px;
-                font-weight: 600;
+                color: #9CA3AF; font-size: 18px; font-weight: 600;
                 font-family: 'Segoe UI', sans-serif;
             }
         """)
@@ -463,7 +487,6 @@ class MovieCard(QFrame):
         )
         root.addWidget(img)
 
-        # Info
         pad = QVBoxLayout()
         pad.setContentsMargins(16, 14, 16, 16)
         pad.setSpacing(4)
@@ -488,10 +511,9 @@ class MovieCard(QFrame):
 
         data     = self._db.obtener_pelicula_por_id(getattr(self.pelicula, "id", None))
         promedio = data.get("promedio_calificacion") if data else None
-        estrellas_str = _estrellas(promedio)
-        prom_str = f"  {promedio}" if promedio is not None else "  -"
-
-        lbl_stars = QLabel(estrellas_str + prom_str)
+        lbl_stars = QLabel(
+            _estrellas(promedio) + (f"  {promedio}" if promedio is not None else "  -")
+        )
         lbl_stars.setStyleSheet(
             "color: #F59E0B; font-size: 12px; background: transparent;"
             "font-family: 'Segoe UI', sans-serif;"
@@ -542,7 +564,7 @@ class MovieCard(QFrame):
         super().mousePressEvent(event)
 
 
-# FILA DE PELICULA (lista)
+# MOVIE ROW (lista)
 
 
 class MovieRow(QFrame):
@@ -567,17 +589,13 @@ class MovieRow(QFrame):
         layout.setContentsMargins(14, 14, 18, 14)
         layout.setSpacing(16)
 
-        # Thumbnail
         thumb = QLabel()
         thumb.setFixedSize(54, 76)
         thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
         thumb.setStyleSheet("""
             QLabel {
-                background-color: #F3F4F6;
-                border-radius: 8px;
-                color: #9CA3AF;
-                font-size: 11px;
-                font-weight: 600;
+                background-color: #F3F4F6; border-radius: 8px;
+                color: #9CA3AF; font-size: 11px; font-weight: 600;
                 font-family: 'Segoe UI', sans-serif;
             }
         """)
@@ -588,7 +606,6 @@ class MovieRow(QFrame):
             thumb.setText((self.pelicula.titulo or "?")[:2].upper())
         layout.addWidget(thumb)
 
-        # Info
         col_info = QVBoxLayout()
         col_info.setSpacing(3)
         col_info.setContentsMargins(0, 0, 0, 0)
@@ -620,7 +637,6 @@ class MovieRow(QFrame):
         col_info.addStretch()
         layout.addLayout(col_info, stretch=1)
 
-        # Derecha: estrellas + botones
         col_right = QVBoxLayout()
         col_right.setSpacing(4)
         col_right.setContentsMargins(0, 0, 0, 0)
@@ -628,13 +644,10 @@ class MovieRow(QFrame):
 
         data     = self._db.obtener_pelicula_por_id(getattr(self.pelicula, "id", None))
         promedio = data.get("promedio_calificacion") if data else None
-
         lbl_stars = QLabel(
             _estrellas(promedio) + (f"  {promedio}" if promedio is not None else "  -")
         )
-        lbl_stars.setStyleSheet(
-            "color: #F59E0B; font-size: 12px; background: transparent;"
-        )
+        lbl_stars.setStyleSheet("color: #F59E0B; font-size: 12px; background: transparent;")
         lbl_stars.setAlignment(Qt.AlignmentFlag.AlignRight)
         col_right.addWidget(lbl_stars)
         col_right.addSpacing(6)
@@ -678,7 +691,7 @@ class MovieRow(QFrame):
         super().mousePressEvent(event)
 
 
-# TARJETA AGREGAR (solo admin)
+# ADD CARD (solo admin)
 
 
 class AddMovieCard(QFrame):
@@ -689,7 +702,10 @@ class AddMovieCard(QFrame):
         self.setObjectName("addCard")
         self.setStyleSheet(STYLE_ADD_CARD)
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.setFixedWidth(220) if not modo_lista else self.setFixedHeight(100)
+        if not modo_lista:
+            self.setFixedWidth(220)
+        else:
+            self.setFixedHeight(100)
 
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -715,7 +731,7 @@ class AddMovieCard(QFrame):
         super().mousePressEvent(event)
 
 
-# BADGE DE USUARIO (sidebar)
+# USER BADGE
 
 
 class UserBadge(QWidget):
@@ -750,87 +766,21 @@ class UserBadge(QWidget):
         layout.addWidget(lbl_rol)
 
 
+# PÁGINA — CATÁLOGO
 
-# VENTANA PRINCIPAL DEL CATALOGO
 
+class _PaginaCatalogo(QWidget):
+    navigate_to_reviews = pyqtSignal(object)
 
-class CatalogoWindow(QWidget):
-    open_edit    = pyqtSignal(object)
-    open_reviews = pyqtSignal(object)
-
-    def __init__(self, usuario="usuario", rol: str = "lector", parent=None):
+    def __init__(self, es_admin: bool, parent=None):
         super().__init__(parent)
+        self.es_admin = es_admin
+        self._vista   = "grid"
+        self.setStyleSheet("background: #F7F8FA;")
+        self._build()
 
-        if isinstance(usuario, dict):
-            self.usuario_dict = usuario
-            self.usuario      = usuario.get("nombre_usuario", "usuario")
-            rol_raw           = str(usuario.get("rol", rol)).lower().strip()
-        else:
-            self.usuario_dict = {"nombre_usuario": usuario, "id": None, "rol": rol}
-            self.usuario      = usuario
-            rol_raw           = str(rol).lower().strip()
-
-        self.rol        = "admin" if rol_raw in ("admin", "administrador") else "lector"
-        self.es_admin   = (self.rol == "admin")
-        self.usuario_id = self.usuario_dict.get("id") or 0
-        self._vista     = "grid"
-
-        self.setWindowTitle("Catalogo de peliculas")
-        self.setMinimumSize(980, 660)
-        self.setStyleSheet(STYLE_APP)
-        self._build_ui()
-        self._cargar_catalogo()
-
-    def _build_ui(self):
-        raiz = QHBoxLayout(self)
-        raiz.setContentsMargins(0, 0, 0, 0)
-        raiz.setSpacing(0)
-
-        # SIDEBAR 
-        sidebar = QFrame()
-        sidebar.setObjectName("sidebar")
-        sidebar.setStyleSheet(STYLE_SIDEBAR)
-        sidebar.setFixedWidth(220)
-
-        sb = QVBoxLayout(sidebar)
-        sb.setContentsMargins(12, 0, 12, 20)
-        sb.setSpacing(2)
-
-        sb.addWidget(UserBadge(self.usuario, self.rol))
-
-        div = QFrame()
-        div.setFrameShape(QFrame.Shape.HLine)
-        div.setStyleSheet("background-color: #E5E7EB; border: none; max-height: 1px;")
-        sb.addWidget(div)
-        sb.addSpacing(10)
-
-        self.btn_inicio  = self._nav_btn(SVG_HOME_ACTIVE, "Inicio",      activo=True)
-        self.btn_resenas = self._nav_btn(SVG_STAR,        "Mis Resenas", activo=False)
-
-        # conectar ambos botones de navegación
-        self.btn_inicio.clicked.connect(self._ir_a_inicio)
-        self.btn_resenas.clicked.connect(self._abrir_mis_resenas)
-
-        sb.addWidget(self.btn_inicio)
-        sb.addWidget(self.btn_resenas)
-        sb.addStretch()
-
-        if self.es_admin:
-            btn_add_sb = QPushButton("  Nueva pelicula")
-            btn_add_sb.setFixedHeight(40)
-            btn_add_sb.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn_add_sb.setIcon(_svg_icon(SVG_PLUS, 14))
-            btn_add_sb.setIconSize(QSize(14, 14))
-            btn_add_sb.setStyleSheet(STYLE_BTN_ADD)
-            btn_add_sb.clicked.connect(self._abrir_agregar)
-            sb.addWidget(btn_add_sb)
-
-        raiz.addWidget(sidebar)
-
-        # ── AREA PRINCIPAL
-        main = QWidget()
-        main.setStyleSheet("background: #F7F8FA;")
-        ml = QVBoxLayout(main)
+    def _build(self):
+        ml = QVBoxLayout(self)
         ml.setContentsMargins(0, 0, 0, 0)
         ml.setSpacing(0)
 
@@ -843,15 +793,14 @@ class CatalogoWindow(QWidget):
         tb.setContentsMargins(28, 0, 28, 0)
         tb.setSpacing(12)
 
-        lbl_titulo = QLabel("Lista de peliculas")
-        lbl_titulo.setStyleSheet(
+        lbl = QLabel("Lista de peliculas")
+        lbl.setStyleSheet(
             "color: #111827; font-size: 20px; font-weight: 700;"
             "font-family: 'Segoe UI', sans-serif; background: transparent;"
         )
-        tb.addWidget(lbl_titulo)
+        tb.addWidget(lbl)
         tb.addStretch()
 
-        # contenedor relativo para superponer el ícono de búsqueda
         search_wrap = QWidget()
         search_wrap.setFixedSize(230, 36)
         search_wrap.setStyleSheet("background: transparent;")
@@ -862,18 +811,15 @@ class CatalogoWindow(QWidget):
         self.search_input.setStyleSheet(STYLE_SEARCH)
         self.search_input.textChanged.connect(self._on_search)
 
-        # Ícono de lupa flotante sobre el input (transparente a eventos de ratón)
-        icon_search = QLabel(search_wrap)
-        icon_search.setPixmap(_svg_pixmap(SVG_SEARCH, 15))
-        icon_search.setFixedSize(15, 15)
-        icon_search.move(11, 10)
-        icon_search.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        icon_search.setStyleSheet("background: transparent;")
-        icon_search.raise_()
-
+        icon_s = QLabel(search_wrap)
+        icon_s.setPixmap(_svg_pixmap(SVG_SEARCH, 15))
+        icon_s.setFixedSize(15, 15)
+        icon_s.move(11, 10)
+        icon_s.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        icon_s.setStyleSheet("background: transparent;")
+        icon_s.raise_()
         tb.addWidget(search_wrap)
 
-        # toggles con íconos que cambian color según estado activo
         self.btn_grid_t = QPushButton()
         self.btn_list_t = QPushButton()
         for b in (self.btn_grid_t, self.btn_list_t):
@@ -883,17 +829,13 @@ class CatalogoWindow(QWidget):
             b.setStyleSheet(STYLE_BTN_TOGGLE)
             b.setIconSize(QSize(16, 16))
 
-        # Estado inicial: grid activo con ícono blanco
         self.btn_grid_t.setChecked(True)
         self.btn_grid_t.setIcon(_svg_icon(SVG_GRID_ACTIVE, 16))
         self.btn_list_t.setIcon(_svg_icon(SVG_LIST, 16))
-
         self.btn_grid_t.clicked.connect(lambda: self._cambiar_vista("grid"))
         self.btn_list_t.clicked.connect(lambda: self._cambiar_vista("lista"))
-
         tb.addWidget(self.btn_grid_t)
         tb.addWidget(self.btn_list_t)
-
         ml.addWidget(topbar)
 
         # Contador
@@ -922,38 +864,25 @@ class CatalogoWindow(QWidget):
         self.inner = QVBoxLayout(self.container)
         self.inner.setContentsMargins(28, 4, 28, 28)
         self.inner.setSpacing(10)
-
         self.scroll.setWidget(self.container)
         ml.addWidget(self.scroll, stretch=1)
-
-        raiz.addWidget(main, stretch=1)
-
-    def _nav_btn(self, svg: str, texto: str, activo: bool = False) -> QPushButton:
-        btn = QPushButton(f"    {texto}")
-        btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setFixedHeight(40)
-        btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        btn.setIcon(_svg_icon(svg, 15))
-        btn.setIconSize(QSize(15, 15))
-        btn.setStyleSheet(STYLE_BTN_NAV_ACTIVE if activo else STYLE_BTN_NAV)
-        return btn
-
-    # VISTAS 
 
     def _cambiar_vista(self, vista: str):
         self._vista = vista
         self.btn_grid_t.setChecked(vista == "grid")
         self.btn_list_t.setChecked(vista == "lista")
-        # FIX 2: intercambiar ícono SVG al cambiar estado
         self.btn_grid_t.setIcon(
             _svg_icon(SVG_GRID_ACTIVE if vista == "grid" else SVG_GRID, 16)
         )
         self.btn_list_t.setIcon(
             _svg_icon(SVG_LIST_ACTIVE if vista == "lista" else SVG_LIST, 16)
         )
-        self._cargar_catalogo(self.search_input.text().strip())
+        self.cargar(self.search_input.text().strip())
 
-    def _cargar_catalogo(self, query=""):
+    def _on_search(self, text):
+        self.cargar(text.strip())
+
+    def cargar(self, query=""):
         peliculas = _search(query) if query else _get_all()
         self._render(peliculas)
 
@@ -966,12 +895,10 @@ class CatalogoWindow(QWidget):
         self.count_label.setText(
             f"{len(peliculas)} pelicula{'s' if len(peliculas) != 1 else ''}"
         )
-
         if self._vista == "grid":
             self._render_grid(peliculas)
         else:
             self._render_lista(peliculas)
-
         self.inner.addStretch()
 
     def _render_grid(self, peliculas):
@@ -984,7 +911,7 @@ class CatalogoWindow(QWidget):
 
         for i, peli in enumerate(peliculas):
             card = MovieCard(peli, es_admin=self.es_admin)
-            card.explore_clicked.connect(self._navigate_to_reviews)
+            card.explore_clicked.connect(self.navigate_to_reviews)
             card.edit_clicked.connect(self._abrir_editar)
             card.delete_clicked.connect(self._confirmar_eliminar)
             grid.addWidget(card, i // COLS, i % COLS)
@@ -1002,7 +929,7 @@ class CatalogoWindow(QWidget):
     def _render_lista(self, peliculas):
         for peli in peliculas:
             row = MovieRow(peli, es_admin=self.es_admin)
-            row.explore_clicked.connect(self._navigate_to_reviews)
+            row.explore_clicked.connect(self.navigate_to_reviews)
             row.edit_clicked.connect(self._abrir_editar)
             row.delete_clicked.connect(self._confirmar_eliminar)
             self.inner.addWidget(row)
@@ -1012,159 +939,291 @@ class CatalogoWindow(QWidget):
             add.clicked.connect(self._abrir_agregar)
             self.inner.addWidget(add)
 
-    def _on_search(self, text):
-        self._cargar_catalogo(text.strip())
-
-    # ── CRUD ─────────────────────────────────────────────────
-
     def _abrir_agregar(self):
         from peliculaUI import PeliculaUI
-        form = PeliculaUI(pelicula=None, callback=self.refresh, parent=self)
+        form = PeliculaUI(pelicula=None, callback=lambda: self.cargar(), parent=self)
         form.show()
 
     def _abrir_editar(self, pelicula):
         from peliculaUI import PeliculaUI
-        form = PeliculaUI(pelicula=pelicula, callback=self.refresh, parent=self)
+        form = PeliculaUI(pelicula=pelicula, callback=lambda: self.cargar(), parent=self)
         form.show()
 
     def _confirmar_eliminar(self, pelicula):
         msg = QMessageBox(self)
         msg.setWindowTitle("Eliminar pelicula")
-        msg.setText(
-            f"Eliminar \"{pelicula.titulo}\"?\nTambien se borraran sus resenas."
-        )
+        msg.setText(f"Eliminar \"{pelicula.titulo}\"?\nTambien se borraran sus resenas.")
         msg.setStandardButtons(
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         msg.setStyleSheet(STYLE_MSGBOX)
         if msg.exec() == QMessageBox.StandardButton.Yes:
             _del(pelicula)
-            self.refresh()
-
-    def _navigate_to_reviews(self, pelicula):
-        self.open_reviews.emit(pelicula)
-        try:
-            from FormReseñas import FormResenas
-            form = FormResenas(
-                pelicula_id     = getattr(pelicula, "id", None),
-                usuario_id      = self.usuario_id,
-                clase_pelicula  = None,
-                clase_resena    = None,
-                titulo_pelicula = getattr(pelicula, "titulo", "Sin titulo"),
-                pelicula_obj    = pelicula,
-            )
-        except ImportError:
-            form = _PlaceholderReviews(pelicula, self.usuario)
-
-        if not hasattr(self, "_ventanas_resenas"):
-            self._ventanas_resenas = []
-        self._ventanas_resenas.append(form)
-        form.destroyed.connect(
-            lambda obj=form: self._ventanas_resenas.remove(obj)
-            if obj in self._ventanas_resenas else None
-        )
-        form.destroyed.connect(lambda: self.refresh())
-        form.show()
-        form.raise_()
-        form.activateWindow()
-
-    # ── NAVEGACION SIDEBAR ───────────────────────────────────
-
-    def _ir_a_inicio(self):
-        """Marca Inicio como activo y refresca el catálogo."""
-        self.btn_inicio.setStyleSheet(STYLE_BTN_NAV_ACTIVE)
-        self.btn_inicio.setIcon(_svg_icon(SVG_HOME_ACTIVE, 15))
-        self.btn_resenas.setStyleSheet(STYLE_BTN_NAV)
-        self.btn_resenas.setIcon(_svg_icon(SVG_STAR, 15))
-        self.refresh()
-
-    def _abrir_mis_resenas(self):
-        """Abre el formulario de reseñas del usuario actual."""
-        # Actualiza estado visual del nav
-        self.btn_resenas.setStyleSheet(STYLE_BTN_NAV_ACTIVE)
-        self.btn_resenas.setIcon(_svg_icon(SVG_STAR_ACTIVE, 15))
-        self.btn_inicio.setStyleSheet(STYLE_BTN_NAV)
-        self.btn_inicio.setIcon(_svg_icon(SVG_HOME, 15))
-
-        try:
-            from FormReseñas import FormResenas
-            form = FormResenas(
-                pelicula_id     = None,
-                usuario_id      = self.usuario_id,
-                clase_pelicula  = None,
-                clase_resena    = None,
-                titulo_pelicula = "Mis Resenas",
-                pelicula_obj    = None,
-            )
-        except ImportError:
-            _fake = type("_P", (), {"titulo": "Mis Resenas"})()
-            form  = _PlaceholderReviews(_fake, self.usuario)
-
-        if not hasattr(self, "_ventanas_resenas"):
-            self._ventanas_resenas = []
-        self._ventanas_resenas.append(form)
-
-        def _on_close():
-            if form in self._ventanas_resenas:
-                self._ventanas_resenas.remove(form)
-            self._restaurar_nav_inicio()
-
-        form.destroyed.connect(_on_close)
-        form.show()
-        form.raise_()
-        form.activateWindow()
-
-    def _restaurar_nav_inicio(self):
-        """Restaura Inicio como activo cuando se cierra Mis Reseñas."""
-        self.btn_inicio.setStyleSheet(STYLE_BTN_NAV_ACTIVE)
-        self.btn_inicio.setIcon(_svg_icon(SVG_HOME_ACTIVE, 15))
-        self.btn_resenas.setStyleSheet(STYLE_BTN_NAV)
-        self.btn_resenas.setIcon(_svg_icon(SVG_STAR, 15))
-
-    # ── API PUBLICA ──────────────────────────────────────────
-
-    def refresh(self):
-        self._cargar_catalogo(self.search_input.text().strip())
+            self.cargar()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self._cargar_catalogo(self.search_input.text().strip())
+        self.cargar(self.search_input.text().strip())
 
 
-# PLACEHOLDER
+# PÁGINA — RESEÑAS  
 
 
-class _PlaceholderReviews(QWidget):
-    closed = pyqtSignal()
+class _PaginaResenas(QWidget):
+    """
+    Monta el topbar idéntico al catálogo (con botón ← Catálogo)
+    y debajo el cuerpo de FormResenas o el placeholder.
+    """
 
-    def __init__(self, pelicula, usuario, parent=None):
+    def __init__(self, pelicula, usuario_id: int, titulo: str,
+                 on_back, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Resenas - {pelicula.titulo}")
-        self.setMinimumSize(900, 620)
-        self.setStyleSheet(STYLE_APP)
+        self.setStyleSheet("background: #F7F8FA;")
 
+        ml = QVBoxLayout(self)
+        ml.setContentsMargins(0, 0, 0, 0)
+        ml.setSpacing(0)
+
+       
+        topbar = QFrame()
+        topbar.setObjectName("topbar")
+        topbar.setStyleSheet(STYLE_TOPBAR)
+        topbar.setFixedHeight(64)
+        tb = QHBoxLayout(topbar)
+        tb.setContentsMargins(20, 0, 28, 0)
+        tb.setSpacing(10)
+
+
+        lbl = QLabel(titulo)
+        lbl.setStyleSheet(
+            "color: #111827; font-size: 20px; font-weight: 700;"
+            "font-family: 'Segoe UI', sans-serif; background: transparent;"
+        )
+        tb.addWidget(lbl)
+        tb.addStretch()
+        ml.addWidget(topbar)
+
+        # ── Cuerpo
+        try:
+            from FormReseñas import FormResenas
+            body = FormResenas(
+                pelicula_id     = getattr(pelicula, "id", None) if pelicula else None,
+                usuario_id      = usuario_id,
+                clase_pelicula  = None,
+                clase_resena    = None,
+                titulo_pelicula = titulo,
+                pelicula_obj    = pelicula,
+            )
+            body.setWindowFlags(Qt.WindowType.Widget)
+        except ImportError:
+            body = _CuerpoPlaceholder(titulo)
+
+        body.setStyleSheet("background: #F7F8FA;")
+        ml.addWidget(body, stretch=1)
+
+
+class _CuerpoPlaceholder(QWidget):
+    """Cuerpo cuando FormResenas no está disponible."""
+    def __init__(self, titulo, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("background: transparent;")
         lay = QVBoxLayout(self)
         lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.setSpacing(16)
 
-        lbl = QLabel(f"{pelicula.titulo}\nFormResenas.py aun no esta disponible.")
+        icon = QLabel()
+        icon.setPixmap(_svg_pixmap(SVG_FILM, 64))
+        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon.setStyleSheet("background: transparent;")
+        lay.addWidget(icon)
+
+        lbl = QLabel(f'Reseñas de "{titulo}"')
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl.setStyleSheet("color: #6B7280; font-size: 14px; background: transparent;")
+        lbl.setStyleSheet(
+            "color: #374151; font-size: 16px; font-weight: 600;"
+            "font-family: 'Segoe UI', sans-serif; background: transparent;"
+        )
         lay.addWidget(lbl)
 
-        btn_back = QPushButton("Volver al catalogo")
-        btn_back.setFixedSize(200, 40)
-        btn_back.setStyleSheet(STYLE_BTN_ADD)
-        btn_back.clicked.connect(self._cerrar)
-        lay.addWidget(btn_back, alignment=Qt.AlignmentFlag.AlignCenter)
-
-    def _cerrar(self):
-        self.closed.emit()
-        self.close()
+        sub = QLabel("FormResenas.py aún no está disponible.")
+        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sub.setStyleSheet("color: #9CA3AF; font-size: 13px; background: transparent;")
+        lay.addWidget(sub)
 
 
-# ─────────────────────────────────────────────────────────────
+
+# VENTANA PRINCIPAL  
+
+
+class CatalogoWindow(QWidget):
+    open_edit    = pyqtSignal(object)
+    open_reviews = pyqtSignal(object)
+
+    _IDX_CATALOGO = 0
+    _IDX_RESENAS  = 1
+
+    def __init__(self, usuario="usuario", rol: str = "lector", parent=None):
+        super().__init__(parent)
+
+        if isinstance(usuario, dict):
+            self.usuario_dict = usuario
+            self.usuario      = usuario.get("nombre_usuario", "usuario")
+            rol_raw           = str(usuario.get("rol", rol)).lower().strip()
+        else:
+            self.usuario_dict = {"nombre_usuario": usuario, "id": None, "rol": rol}
+            self.usuario      = usuario
+            rol_raw           = str(rol).lower().strip()
+
+        self.rol        = "admin" if rol_raw in ("admin", "administrador") else "lector"
+        self.es_admin   = (self.rol == "admin")
+        self.usuario_id = self.usuario_dict.get("id") or 0
+
+        self.setWindowTitle("Catalogo de peliculas")
+        self.setMinimumSize(980, 660)
+        self.setStyleSheet(STYLE_APP)
+        self._build_ui()
+        self._pagina_catalogo.cargar()
+
+    # ── CONSTRUCCIÓN 
+
+    def _build_ui(self):
+        raiz = QHBoxLayout(self)
+        raiz.setContentsMargins(0, 0, 0, 0)
+        raiz.setSpacing(0)
+
+        # ── SIDEBAR (siempre visible)
+        sidebar = QFrame()
+        sidebar.setObjectName("sidebar")
+        sidebar.setStyleSheet(STYLE_SIDEBAR)
+        sidebar.setFixedWidth(220)
+
+        sb = QVBoxLayout(sidebar)
+        sb.setContentsMargins(12, 0, 12, 20)
+        sb.setSpacing(2)
+
+        sb.addWidget(UserBadge(self.usuario, self.rol))
+
+        div = QFrame()
+        div.setFrameShape(QFrame.Shape.HLine)
+        div.setStyleSheet("background-color: #E5E7EB; border: none; max-height: 1px;")
+        sb.addWidget(div)
+        sb.addSpacing(10)
+
+        self.btn_inicio  = self._nav_btn(SVG_HOME_ACTIVE, "Inicio",      activo=True)
+        self.btn_resenas = self._nav_btn(SVG_STAR,        "Mis Resenas", activo=False)
+        self.btn_inicio.clicked.connect(self._ir_a_inicio)
+        self.btn_resenas.clicked.connect(self._abrir_mis_resenas)
+
+        sb.addWidget(self.btn_inicio)
+        sb.addWidget(self.btn_resenas)
+        sb.addStretch()
+
+        if self.es_admin:
+            btn_add_sb = QPushButton("  Nueva pelicula")
+            btn_add_sb.setFixedHeight(40)
+            btn_add_sb.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_add_sb.setIcon(_svg_icon(SVG_PLUS, 14))
+            btn_add_sb.setIconSize(QSize(14, 14))
+            btn_add_sb.setStyleSheet(STYLE_BTN_ADD)
+            btn_add_sb.clicked.connect(self._abrir_agregar_sidebar)
+            sb.addWidget(btn_add_sb)
+
+        raiz.addWidget(sidebar)
+
+        # ── STACK
+        self._stack = QStackedWidget()
+        self._stack.setStyleSheet("background: #F7F8FA;")
+
+        
+        self._pagina_catalogo = _PaginaCatalogo(es_admin=self.es_admin)
+        self._pagina_catalogo.navigate_to_reviews.connect(self._navigate_to_reviews)
+        self._stack.addWidget(self._pagina_catalogo)
+
+        
+        self._pagina_resenas_actual = QWidget()
+        self._stack.addWidget(self._pagina_resenas_actual)
+
+        raiz.addWidget(self._stack, stretch=1)
+
+    def _nav_btn(self, svg: str, texto: str, activo: bool = False) -> QPushButton:
+        btn = QPushButton(f"    {texto}")
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setFixedHeight(40)
+        btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        btn.setIcon(_svg_icon(svg, 15))
+        btn.setIconSize(QSize(15, 15))
+        btn.setStyleSheet(STYLE_BTN_NAV_ACTIVE if activo else STYLE_BTN_NAV)
+        return btn
+
+    # ── NAVEGACIÓN 
+
+    def _ir_a_inicio(self):
+        self._set_nav("inicio")
+        self._pagina_catalogo.cargar()
+        self._stack.setCurrentIndex(self._IDX_CATALOGO)
+
+    def _abrir_mis_resenas(self):
+        self._set_nav("resenas")
+        self._swap_resenas(pelicula=None, titulo="Mis Resenas")
+
+    def _navigate_to_reviews(self, pelicula):
+        self.open_reviews.emit(pelicula)
+        self._set_nav("resenas")
+        titulo = getattr(pelicula, "titulo", "Sin titulo")
+        self._swap_resenas(pelicula=pelicula, titulo=titulo)
+
+    def _swap_resenas(self, pelicula, titulo: str):
+        """Reemplaza la página de reseñas en el stack y muestra el índice 1."""
+        # Quitar la página anterior del slot 1
+        old = self._stack.widget(self._IDX_RESENAS)
+        if old is not None:
+            self._stack.removeWidget(old)
+            old.deleteLater()
+
+        nueva = _PaginaResenas(
+            pelicula   = pelicula,
+            usuario_id = self.usuario_id,
+            titulo     = titulo,
+            on_back    = self._ir_a_inicio,
+        )
+        self._stack.insertWidget(self._IDX_RESENAS, nueva)
+        self._pagina_resenas_actual = nueva
+        self._stack.setCurrentIndex(self._IDX_RESENAS)
+
+    def _set_nav(self, cual: str):
+        if cual == "inicio":
+            self.btn_inicio.setStyleSheet(STYLE_BTN_NAV_ACTIVE)
+            self.btn_inicio.setIcon(_svg_icon(SVG_HOME_ACTIVE, 15))
+            self.btn_resenas.setStyleSheet(STYLE_BTN_NAV)
+            self.btn_resenas.setIcon(_svg_icon(SVG_STAR, 15))
+        else:
+            self.btn_resenas.setStyleSheet(STYLE_BTN_NAV_ACTIVE)
+            self.btn_resenas.setIcon(_svg_icon(SVG_STAR_ACTIVE, 15))
+            self.btn_inicio.setStyleSheet(STYLE_BTN_NAV)
+            self.btn_inicio.setIcon(_svg_icon(SVG_HOME, 15))
+
+    def _abrir_agregar_sidebar(self):
+        from peliculaUI import PeliculaUI
+        form = PeliculaUI(pelicula=None, callback=self.refresh, parent=self)
+        form.show()
+
+    # ── API PÚBLICA ──────────────────────────────────────────
+
+    def refresh(self):
+        self._pagina_catalogo.cargar(
+            self._pagina_catalogo.search_input.text().strip()
+        )
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._pagina_catalogo.cargar(
+            self._pagina_catalogo.search_input.text().strip()
+        )
+
+
+
 # STANDALONE
-# ─────────────────────────────────────────────────────────────
+
 
 if __name__ == "__main__":
     usuario = sys.argv[1] if len(sys.argv) > 1 else "pablo_99"
