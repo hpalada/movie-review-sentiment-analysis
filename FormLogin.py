@@ -68,7 +68,7 @@ class FormLogin(QWidget):
         layout_izq = QVBoxLayout(seccion_izq)
         layout_izq.setContentsMargins(80, 0, 40, 0); layout_izq.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        lbl_logo = QLabel("MOVIE AI"); lbl_logo.setStyleSheet("color: #ffffff; font-size: 22px; font-weight: bold;")
+        lbl_logo = QLabel("CINE AI"); lbl_logo.setStyleSheet("color: #ffffff; font-size: 22px; font-weight: bold;")
         lbl_titulo = QLabel("Analiza el cine."); lbl_titulo.setStyleSheet("color: #ffffff; font-size: 52px; font-weight: 800;")
         lbl_desc = QLabel("Plataforma avanzada de análisis cinematográfico con IA."); lbl_desc.setStyleSheet("color: #94a3b8; font-size: 15px;")
         

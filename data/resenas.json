@@ -28,13 +28,13 @@
             "id": 4,
             "usuario_id": 3,
             "pelicula_id": 1,
-            "texto": "dsjkfhjksdahfkjdsghjfkdsagfkgsdafhgfadskj",
+            "texto": "dsjkfhjksdahfkjdsghj",
             "valoracion_ia": 3.02,
             "etiquetas_ia": [
                 " Neutral"
             ],
             "fecha_creacion": "2026-03-25T16:13:47.493443",
-            "fecha_modificacion": null
+            "fecha_modificacion": "2026-04-07T00:48:22.992893"
         },
         {
             "id": 5,
