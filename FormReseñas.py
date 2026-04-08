@@ -3,7 +3,7 @@ import os
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QScrollArea, QPushButton, QFrame, QSizePolicy,
-    QGraphicsDropShadowEffect
+    QGraphicsDropShadowEffect, QDialog
 )
 from PyQt6.QtCore import Qt, QByteArray, QSize
 from PyQt6.QtGui import QPixmap, QColor, QFont, QIcon, QPainter
@@ -15,11 +15,9 @@ from rutas import ruta_imagen
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  THEME — siempre importado desde Catalogo para compartir el mismo _mode
-#  Si Catalogo no está disponible se usa el fallback LOCAL, pero en ese caso
-#  refresh_theme() sigue funcionando porque lee Theme.get() en tiempo de llamada.
 # ══════════════════════════════════════════════════════════════════════════════
 try:
-    from catalogoPrincipal import Theme          # ← mismo objeto que usa CatalogoWindow
+    from catalogoPrincipal import Theme
     _HAS_THEME = True
 except ImportError:
     _HAS_THEME = False
@@ -158,6 +156,139 @@ def _svg_trash_themed() -> bytes:
   <path d="M10 11v6"/><path d="M14 11v6"/>
   <path d="M9 6V4a1 1 0 0 1 1-1h4 a1 1 0 0 1 1 1v2"/>
 </svg>""".encode()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  DIÁLOGO CUSTOM (reemplaza QMessageBox — sin barra del sistema)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class _CustomDialog(QDialog):
+    """
+    Ventana emergente personalizada sin barra de título del sistema operativo.
+    Muestra texto y uno o dos botones. Devuelve True si el usuario confirmó.
+    """
+    def __init__(self, titulo: str, mensaje: str, btn_ok: str = "Aceptar",
+                 btn_cancel: str = None, parent=None):
+        super().__init__(parent)
+        self._result = False
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setModal(True)
+        self._build(titulo, mensaje, btn_ok, btn_cancel)
+
+    def _build(self, titulo, mensaje, btn_ok, btn_cancel):
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        card = QFrame()
+        card.setObjectName("dlgCard")
+        card.setStyleSheet(f"""
+            QFrame#dlgCard {{
+                background-color: {Theme.get('bg_card')};
+                border-radius: 14px;
+                border: 1px solid {Theme.get('border_main')};
+            }}
+        """)
+
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(32)
+        shadow.setOffset(0, 8)
+        shadow.setColor(QColor(0, 0, 0, 60))
+        card.setGraphicsEffect(shadow)
+
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(28, 24, 28, 20)
+        lay.setSpacing(0)
+
+        # Título
+        lbl_titulo = QLabel(titulo)
+        lbl_titulo.setStyleSheet(f"""
+            color: {Theme.get('text_primary')};
+            font-size: 15px; font-weight: 700;
+            font-family: 'Segoe UI', sans-serif;
+            background: transparent;
+        """)
+        lay.addWidget(lbl_titulo)
+        lay.addSpacing(10)
+
+        # Mensaje
+        lbl_msg = QLabel(mensaje)
+        lbl_msg.setWordWrap(True)
+        lbl_msg.setStyleSheet(f"""
+            color: {Theme.get('text_secondary')};
+            font-size: 13px;
+            font-family: 'Segoe UI', sans-serif;
+            background: transparent;
+        """)
+        lay.addWidget(lbl_msg)
+        lay.addSpacing(22)
+
+        # Botones
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+        btn_row.addStretch()
+
+        if btn_cancel:
+            b_cancel = QPushButton(btn_cancel)
+            b_cancel.setFixedHeight(38)
+            b_cancel.setMinimumWidth(100)
+            b_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+            b_cancel.setStyleSheet(f"""
+                QPushButton {{
+                    background: transparent;
+                    color: {Theme.get('text_secondary')};
+                    border: 1.5px solid {Theme.get('border_card')};
+                    border-radius: 8px; padding: 0 18px;
+                    font-size: 13px; font-weight: 600;
+                    font-family: 'Segoe UI', sans-serif;
+                }}
+                QPushButton:hover {{
+                    background-color: {Theme.get('bg_hover')};
+                    border-color: {Theme.get('border_main')};
+                    color: {Theme.get('text_primary')};
+                }}
+            """)
+            b_cancel.clicked.connect(self.reject)
+            btn_row.addWidget(b_cancel)
+
+        b_ok = QPushButton(btn_ok)
+        b_ok.setFixedHeight(38)
+        b_ok.setMinimumWidth(100)
+        b_ok.setCursor(Qt.CursorShape.PointingHandCursor)
+        b_ok.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Theme.get('accent_btn')};
+                color: #FFFFFF; border: none; border-radius: 8px;
+                padding: 0 18px; font-size: 13px; font-weight: 600;
+                font-family: 'Segoe UI', sans-serif;
+            }}
+            QPushButton:hover {{ background-color: {Theme.get('accent_btn_h')}; }}
+            QPushButton:pressed {{ background-color: {Theme.get('accent_btn_p')}; }}
+        """)
+        b_ok.clicked.connect(self._on_ok)
+        btn_row.addWidget(b_ok)
+
+        lay.addLayout(btn_row)
+        outer.addWidget(card)
+        self.setFixedWidth(380)
+
+    def _on_ok(self):
+        self._result = True
+        self.accept()
+
+    @staticmethod
+    def preguntar(titulo: str, mensaje: str, btn_si: str = "Sí",
+                  btn_no: str = "No", parent=None) -> bool:
+        dlg = _CustomDialog(titulo, mensaje, btn_ok=btn_si,
+                             btn_cancel=btn_no, parent=parent)
+        dlg.exec()
+        return dlg._result
+
+    @staticmethod
+    def informar(titulo: str, mensaje: str, parent=None):
+        dlg = _CustomDialog(titulo, mensaje, btn_ok="Aceptar",
+                             btn_cancel=None, parent=parent)
+        dlg.exec()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -308,18 +439,6 @@ def S_DIVIDER():
 def S_AVATAR():
     return f"QLabel#avatar {{ background-color: {Theme.get('bg_avatar')}; color: {Theme.get('text_avatar')}; border-radius: 16px; font-size: 13px; font-weight: 700; font-family: 'Segoe UI', sans-serif; }}"
 
-def S_MSGBOX():
-    return f"""
-    QMessageBox {{ background-color: {Theme.get('bg_card')}; font-family: 'Segoe UI', sans-serif; }}
-    QMessageBox QLabel {{ color: {Theme.get('text_primary')}; font-size: 13px; }}
-    QMessageBox QPushButton {{
-        background-color: {Theme.get('accent_btn')}; color: white; border: none;
-        border-radius: 8px; padding: 8px 20px;
-        font-size: 12px; font-weight: 600; min-width: 80px;
-    }}
-    QMessageBox QPushButton:hover {{ background-color: {Theme.get('accent_btn_h')}; }}
-    """
-
 def S_NUM_GRANDE():
     return f"color: {Theme.get('text_primary')}; font-size: 22px; font-weight: 700; font-family: 'Segoe UI', sans-serif; background: transparent;"
 
@@ -359,11 +478,11 @@ def _estrellas_widget(valoracion, maximo: int = 5) -> QWidget:
 
     for i in range(5):
         if val_norm >= i + 1:
-            star = _svg_widget(SVG_STAR_FILLED, 18)
+            star = _svg_widget(SVG_STAR_FILLED, 15)
         elif val_norm >= i + 0.5:
-            star = _svg_widget(SVG_STAR_HALF, 18)
+            star = _svg_widget(SVG_STAR_HALF, 15)
         else:
-            star = _svg_widget(SVG_STAR_EMPTY, 18)
+            star = _svg_widget(SVG_STAR_EMPTY, 15)
         fila.addWidget(star)
 
     fila.addStretch()
@@ -420,7 +539,7 @@ class FormReseñas(QWidget):
         layout_raiz.setContentsMargins(0, 0, 0, 0)
         layout_raiz.setSpacing(0)
 
-        # Cabecera fija
+        # Cabecera fija — SIN topbar duplicado, solo la cabecera con poster+info
         self.widget_cabecera = self._crear_cabecera()
         layout_raiz.addWidget(self.widget_cabecera)
 
@@ -464,15 +583,15 @@ class FormReseñas(QWidget):
         self.btn_agregar.clicked.connect(self._abrir_form_agregar)
         layout_raiz.addWidget(self.btn_agregar)
 
-    # ── Cabecera — botón Regresar en la esquina superior DERECHA ─────────────
+    # ── Cabecera — altura aumentada para dar espacio a poster + estrellas ─────
 
     def _crear_cabecera(self) -> QFrame:
         frame = QFrame()
         frame.setObjectName("cabecera")
         frame.setStyleSheet(S_CABECERA())
-        frame.setFixedHeight(220)
+        # Altura aumentada para que las estrellas no choquen con el poster
+        frame.setFixedHeight(240)
 
-        # Layout raíz vertical: fila superior (btn regresar) + fila de contenido
         layout_raiz = QVBoxLayout(frame)
         layout_raiz.setContentsMargins(32, 14, 32, 16)
         layout_raiz.setSpacing(6)
@@ -481,7 +600,7 @@ class FormReseñas(QWidget):
         fila_superior = QHBoxLayout()
         fila_superior.setContentsMargins(0, 0, 0, 0)
         fila_superior.setSpacing(0)
-        fila_superior.addStretch()   # empuja el botón a la derecha
+        fila_superior.addStretch()
 
         self.btn_regresar = QPushButton("  Regresar al catálogo")
         self.btn_regresar.setFixedHeight(32)
@@ -501,14 +620,14 @@ class FormReseñas(QWidget):
         fila_contenido.setContentsMargins(0, 0, 0, 0)
         fila_contenido.setSpacing(28)
 
-        # Poster
+        # Poster — tamaño fijo que no supere la cabecera
         self.lbl_poster = QLabel("POSTER")
         self.lbl_poster.setObjectName("poster")
-        self.lbl_poster.setFixedSize(116, 140)
+        self.lbl_poster.setFixedSize(116, 155)   # más alto para que quepan las estrellas abajo
         self.lbl_poster.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_poster.setStyleSheet(S_POSTER())
         fila_contenido.addWidget(
-            self.lbl_poster, alignment=Qt.AlignmentFlag.AlignVCenter
+            self.lbl_poster, alignment=Qt.AlignmentFlag.AlignTop
         )
 
         # Columna de información
@@ -519,7 +638,7 @@ class FormReseñas(QWidget):
         self.lbl_nombre = QLabel(self.titulo_pelicula or "Película")
         self.lbl_nombre.setStyleSheet(S_TITULO_PELICULA())
         layout_info.addWidget(self.lbl_nombre)
-        layout_info.addSpacing(10)
+        layout_info.addSpacing(12)
 
         # Promedio
         fila_promedio = QHBoxLayout()
@@ -537,12 +656,12 @@ class FormReseñas(QWidget):
         fila_promedio.addWidget(self.lbl_sobre_cinco)
         fila_promedio.addStretch()
         layout_info.addLayout(fila_promedio)
-        layout_info.addSpacing(6)
+        layout_info.addSpacing(8)
 
-        # Estrellas pequeñas
+        # Estrellas pequeñas — separadas del promedio con espacio propio
         self.widget_estrellas = _estrellas_widget(0, maximo=5)
         layout_info.addWidget(self.widget_estrellas)
-        layout_info.addSpacing(10)
+        layout_info.addSpacing(12)
 
         # Chips de etiquetas
         self.fila_etiquetas = QHBoxLayout()
@@ -574,17 +693,33 @@ class FormReseñas(QWidget):
     def _cargar_info_pelicula(self):
         if self.pelicula_obj:
             ruta_poster = ruta_imagen(getattr(self.pelicula_obj, "imagen", None))
+
             if ruta_poster and os.path.exists(ruta_poster):
                 pixmap = QPixmap(ruta_poster)
                 if not pixmap.isNull():
                     self.lbl_poster.setPixmap(
-                        pixmap.scaled(116, 140,
-                                      Qt.AspectRatioMode.KeepAspectRatio,
-                                      Qt.TransformationMode.SmoothTransformation)
+                        pixmap.scaled(
+                            116, 155,
+                            Qt.AspectRatioMode.KeepAspectRatio,
+                            Qt.TransformationMode.SmoothTransformation
+                        )
                     )
                     self.lbl_poster.setStyleSheet(S_POSTER_FILLED())
+                else:
+                    # 🔥 si la imagen falla → limpiar
+                    self.lbl_poster.clear()
+                    self.lbl_poster.setText("POSTER")
+                    self.lbl_poster.setStyleSheet(S_POSTER())
+            else:
+                # 🔥 SI NO HAY IMAGEN → limpiar (ESTO ERA LO QUE TE FALTABA)
+                self.lbl_poster.clear()
+                self.lbl_poster.setText("POSTER")
+                self.lbl_poster.setStyleSheet(S_POSTER())
+
             titulo = getattr(self.pelicula_obj, "titulo", self.titulo_pelicula)
             self.lbl_nombre.setText(titulo or "Sin título")
+
+            self._actualizar_promedio_ui()
 
         self._actualizar_promedio_ui()
 
@@ -672,10 +807,11 @@ class FormReseñas(QWidget):
         tarjeta.setObjectName("tarjeta")
         tarjeta.setStyleSheet(S_TARJETA())
         tarjeta.setGraphicsEffect(_sombra_tarjeta())
-
         layout_tarjeta = QHBoxLayout(tarjeta)
         layout_tarjeta.setContentsMargins(20, 18, 20, 18)
         layout_tarjeta.setSpacing(20)
+
+        layout_tarjeta.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         # Avatar
         nombre_usuario = resena.get("nombre_usuario", "?")
@@ -689,7 +825,7 @@ class FormReseñas(QWidget):
 
         # Columna texto
         col_texto = QVBoxLayout()
-        col_texto.setSpacing(4)
+        col_texto.setSpacing(8)
         col_texto.setContentsMargins(0, 0, 0, 0)
 
         fila_top = QHBoxLayout()
@@ -699,6 +835,7 @@ class FormReseñas(QWidget):
         lbl_usuario = QLabel(nombre_usuario)
         lbl_usuario.setStyleSheet(S_USUARIO_LABEL())
         fila_top.addWidget(lbl_usuario)
+        fila_top.addSpacing(8)
 
         stars = _estrellas_widget(resena.get("valoracion_ia"), maximo=5)
         fila_top.addWidget(stars)
@@ -813,16 +950,14 @@ class FormReseñas(QWidget):
         self.form_ae.show()
 
     def _eliminar_resena(self, resena: dict):
-        from PyQt6.QtWidgets import QMessageBox
-
-        confirmacion = QMessageBox.question(
-            self,
+        confirmado = _CustomDialog.preguntar(
             "Eliminar reseña",
             "¿Estás seguro de que quieres eliminar esta reseña?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            btn_si="Eliminar",
+            btn_no="Cancelar",
+            parent=self
         )
-
-        if confirmacion == QMessageBox.StandardButton.Yes:
+        if confirmado:
             uid_eliminar = resena.get("usuario_id") if self.es_admin else self.usuario_id
             resultado = self.clase_resena.eliminar_resena(
                 resena_id  = resena["id"],
@@ -831,63 +966,40 @@ class FormReseñas(QWidget):
             if resultado["exito"]:
                 self._cargar_resenas()
             else:
-                msg = QMessageBox(self)
-                msg.setWindowTitle("Error")
-                msg.setText(resultado["mensaje"])
-                msg.setIcon(QMessageBox.Icon.Warning)
-                msg.setStyleSheet(S_MSGBOX())
-                msg.exec()
+                _CustomDialog.informar(
+                    "Error",
+                    resultado["mensaje"],
+                    parent=self
+                )
 
     # ── Tema oscuro/claro ─────────────────────────────────────────────────────
 
     def refresh_theme(self):
-        """
-        Reaplica todos los estilos con el tema activo en ese momento.
-
-        FLUJO CORRECTO:
-          CatalogoWindow._toggle_theme()
-            → Theme.toggle()               # cambia Theme._mode en Catalogo.py
-            → _apply_theme_full()
-              → _PaginaResenas.refresh_theme()
-                → FormResenas.refresh_theme()   ← aquí
-                  → todas las S_*() leen Theme.get() que ya devuelve el nuevo tema
-
-        Funciona porque FormReseñas importa Theme DESDE Catalogo.py,
-        así que es el MISMO objeto (misma referencia de clase) que toggleó.
-        """
-        # Widget raíz
+        """Reaplica todos los estilos con el tema activo en ese momento."""
         self.setStyleSheet(S_MAIN())
-
-        # Cabecera y divisor
         self.widget_cabecera.setStyleSheet(S_CABECERA())
         self.div_cabecera.setStyleSheet(S_DIVIDER())
 
-        # Botón regresar: ícono regenerado con color del tema nuevo
         self.btn_regresar.setStyleSheet(S_BTN_REGRESAR())
         self.btn_regresar.setIcon(
             QIcon(self._pixmap_from_svg(_svg_back_bytes(), 14))
         )
         self.btn_regresar.setIconSize(QSize(14, 14))
 
-        # Poster: preservar S_POSTER_FILLED si ya tiene imagen cargada
         pixmap_actual = self.lbl_poster.pixmap()
         tiene_imagen = pixmap_actual is not None and not pixmap_actual.isNull()
         self.lbl_poster.setStyleSheet(
             S_POSTER_FILLED() if tiene_imagen else S_POSTER()
         )
 
-        # Etiquetas estáticas
         self.lbl_nombre.setStyleSheet(S_TITULO_PELICULA())
         self.lbl_promedio_num.setStyleSheet(S_PROMEDIO_NUM())
         self.lbl_sobre_cinco.setStyleSheet(S_SOBRE_CINCO())
 
-        # Scroll
         self.scroll_area.setStyleSheet(S_SCROLL())
         self.contenido_scroll.setStyleSheet(S_SCROLL_CONTENT())
         self.lbl_seccion.setStyleSheet(S_SECCION_TITULO())
 
-        # Botón agregar (pie)
         self.btn_agregar.setStyleSheet(S_BTN_AGREGAR())
 
-        # Regenerar tarjetas: los SVGs de editar/trash toman el color nuevo
         self._cargar_resenas()

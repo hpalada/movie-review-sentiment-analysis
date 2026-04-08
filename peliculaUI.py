@@ -2,7 +2,7 @@ import os
 import shutil
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QFileDialog, QMessageBox, QFrame,
+    QLineEdit, QPushButton, QFileDialog, QFrame,
     QGraphicsDropShadowEffect, QScrollArea, QWidget
 )
 from PyQt6.QtGui import QPixmap, QColor
@@ -19,6 +19,132 @@ def _ruta_completa(nombre_archivo: str) -> str:
     if os.path.isabs(nombre_archivo):
         return nombre_archivo
     return os.path.join(CARPETA_IMGS, nombre_archivo)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  DIÁLOGO CUSTOM (sin barra de título del sistema operativo)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class _CustomDialog(QDialog):
+    def __init__(self, titulo: str, mensaje: str, btn_ok: str = "Aceptar",
+                 btn_cancel: str = None, parent=None):
+        super().__init__(parent)
+        self._result = False
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setModal(True)
+        self._build(titulo, mensaje, btn_ok, btn_cancel)
+
+    def _build(self, titulo, mensaje, btn_ok, btn_cancel):
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        card = QFrame()
+        card.setObjectName("dlgCard")
+        card.setStyleSheet("""
+            QFrame#dlgCard {
+                background-color: #FFFFFF;
+                border-radius: 14px;
+                border: 1px solid #E5E7EB;
+            }
+        """)
+
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(32)
+        shadow.setOffset(0, 8)
+        shadow.setColor(QColor(0, 0, 0, 60))
+        card.setGraphicsEffect(shadow)
+
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(28, 24, 28, 20)
+        lay.setSpacing(0)
+
+        lbl_titulo = QLabel(titulo)
+        lbl_titulo.setStyleSheet("""
+            color: #111827;
+            font-size: 15px; font-weight: 700;
+            font-family: 'Segoe UI', sans-serif;
+            background: transparent;
+        """)
+        lay.addWidget(lbl_titulo)
+        lay.addSpacing(10)
+
+        lbl_msg = QLabel(mensaje)
+        lbl_msg.setWordWrap(True)
+        lbl_msg.setStyleSheet("""
+            color: #6B7280;
+            font-size: 13px;
+            font-family: 'Segoe UI', sans-serif;
+            background: transparent;
+        """)
+        lay.addWidget(lbl_msg)
+        lay.addSpacing(22)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+        btn_row.addStretch()
+
+        if btn_cancel:
+            b_cancel = QPushButton(btn_cancel)
+            b_cancel.setFixedHeight(38)
+            b_cancel.setMinimumWidth(100)
+            b_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+            b_cancel.setStyleSheet("""
+                QPushButton {
+                    background: transparent;
+                    color: #6B7280;
+                    border: 1.5px solid #E5E7EB;
+                    border-radius: 8px; padding: 0 18px;
+                    font-size: 13px; font-weight: 600;
+                    font-family: 'Segoe UI', sans-serif;
+                }
+                QPushButton:hover {
+                    background-color: #F3F4F6;
+                    border-color: #D1D5DB;
+                    color: #374151;
+                }
+            """)
+            b_cancel.clicked.connect(self.reject)
+            btn_row.addWidget(b_cancel)
+
+        b_ok = QPushButton(btn_ok)
+        b_ok.setFixedHeight(38)
+        b_ok.setMinimumWidth(100)
+        b_ok.setCursor(Qt.CursorShape.PointingHandCursor)
+        b_ok.setStyleSheet("""
+            QPushButton {
+                background-color: #111827;
+                color: #FFFFFF; border: none; border-radius: 8px;
+                padding: 0 18px; font-size: 13px; font-weight: 600;
+                font-family: 'Segoe UI', sans-serif;
+            }
+            QPushButton:hover { background-color: #1F2937; }
+            QPushButton:pressed { background-color: #374151; }
+        """)
+        b_ok.clicked.connect(self._on_ok)
+        btn_row.addWidget(b_ok)
+
+        lay.addLayout(btn_row)
+        outer.addWidget(card)
+        self.setFixedWidth(380)
+
+    def _on_ok(self):
+        self._result = True
+        self.accept()
+
+    @staticmethod
+    def preguntar(titulo: str, mensaje: str, btn_si: str = "Sí",
+                  btn_no: str = "No", parent=None) -> bool:
+        dlg = _CustomDialog(titulo, mensaje, btn_ok=btn_si,
+                             btn_cancel=btn_no, parent=parent)
+        dlg.exec()
+        return dlg._result
+
+    @staticmethod
+    def informar(titulo: str, mensaje: str, parent=None):
+        dlg = _CustomDialog(titulo, mensaje, btn_ok="Aceptar",
+                             btn_cancel=None, parent=parent)
+        dlg.exec()
 
 
 # Estilos
@@ -180,30 +306,6 @@ STYLE_SCROLL = """
     }
 """
 
-STYLE_MSGBOX = """
-    QMessageBox {
-        background-color: #FFFFFF;
-        font-family: 'Segoe UI', sans-serif;
-    }
-    QMessageBox QLabel {
-        color: #111827;
-        font-size: 13px;
-    }
-    QMessageBox QPushButton {
-        background-color: #111827;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 8px 20px;
-        font-size: 12px;
-        font-weight: 600;
-        min-width: 80px;
-    }
-    QMessageBox QPushButton:hover {
-        background-color: #1F2937;
-    }
-"""
-
 
 def _agregar_campo(parent_layout: QVBoxLayout, etiqueta: str, placeholder: str) -> QLineEdit:
     lbl = QLabel(etiqueta)
@@ -226,11 +328,12 @@ class PeliculaUI(QDialog):
         self.callback   = callback
         self.es_edicion = pelicula is not None
         self._ruta_imagen_original = None
+        # Flag para saber si el usuario explícitamente quitó la imagen
+        self._imagen_eliminada = False
 
         self.setWindowTitle("Editar película" if self.es_edicion else "Agregar película")
         self.setFixedSize(820, 520)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
-        # Barra nativa de Windows igual que los demás formularios
         self.setWindowFlags(
             Qt.WindowType.Window |
             Qt.WindowType.WindowTitleHint |
@@ -246,7 +349,7 @@ class PeliculaUI(QDialog):
 
     def _construir_ui(self):
         root = QVBoxLayout(self)
-        # HEADER INTERNO (como tu diseño)
+        # HEADER INTERNO
         header = QWidget()
         header.setStyleSheet("background: transparent;")
 
@@ -465,11 +568,14 @@ class PeliculaUI(QDialog):
         )
         if ruta:
             self._ruta_imagen_original = ruta
+            self._imagen_eliminada = False          # nueva imagen, no eliminada
             self.input_imagen.setText(os.path.basename(ruta))
             self._mostrar_imagen(ruta)
 
     def _quitar_imagen(self):
+        """Limpia la imagen visual Y marca el flag para que _guardar la elimine del registro."""
         self._ruta_imagen_original = None
+        self._imagen_eliminada = True               # ← flag corregido
         self.input_imagen.clear()
         self.label_imagen.clear()
         self.label_imagen.setText("Sin imagen\nseleccionada")
@@ -515,12 +621,7 @@ class PeliculaUI(QDialog):
     def _guardar(self):
         titulo = self.input_titulo.text().strip()
         if not titulo:
-            msg = QMessageBox(self)
-            msg.setWindowTitle("Error")
-            msg.setText("El título es obligatorio.")
-            msg.setIcon(QMessageBox.Icon.Warning)
-            msg.setStyleSheet(STYLE_MSGBOX)
-            msg.exec()
+            _CustomDialog.informar("Error", "El título es obligatorio.", parent=self)
             return
 
         descripcion = self.input_desc.text().strip() or None
@@ -529,10 +630,16 @@ class PeliculaUI(QDialog):
         anio_txt    = self.input_anio.text().strip()
         anio        = int(anio_txt) if anio_txt.isdigit() else None
 
+        # Lógica de imagen corregida:
+        # - Si el usuario seleccionó una nueva imagen → copiar y usar
+        # - Si el usuario quitó la imagen (_imagen_eliminada) → None
+        # - Si no tocó nada → mantener la imagen anterior (solo en edición)
         if self._ruta_imagen_original:
             imagen = self._copiar_imagen(self._ruta_imagen_original)
+        elif self._imagen_eliminada:
+            imagen = None                           # ← eliminación real
         elif self.es_edicion:
-            imagen = self.pelicula.imagen
+            imagen = self.pelicula.imagen           # ← mantener la anterior
         else:
             imagen = None
 
@@ -549,12 +656,7 @@ class PeliculaUI(QDialog):
             )
             msg_text = "Película guardada."
 
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Éxito")
-        msg.setText(msg_text)
-        msg.setIcon(QMessageBox.Icon.Information)
-        msg.setStyleSheet(STYLE_MSGBOX)
-        msg.exec()
+        _CustomDialog.informar("Éxito", msg_text, parent=self)
 
         if self.callback:
             self.callback()

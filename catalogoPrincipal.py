@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QScrollArea, QFrame, QGridLayout, QSizePolicy,
-    QMessageBox, QApplication, QGraphicsDropShadowEffect,
-    QStackedWidget
+    QApplication, QGraphicsDropShadowEffect,
+    QStackedWidget, QDialog
 )
 from PyQt6.QtGui import QPixmap, QCursor, QColor, QIcon, QPainter
 from PyQt6.QtCore import Qt, pyqtSignal, QSize
@@ -493,18 +493,6 @@ def S_AVATAR():
         }}
     """
 
-def S_MSGBOX():
-    return f"""
-        QMessageBox {{ background-color: {Theme.get("bg_card")}; font-family: 'Segoe UI', sans-serif; }}
-        QMessageBox QLabel {{ color: {Theme.get("text_primary")}; font-size: 13px; }}
-        QMessageBox QPushButton {{
-            background-color: {Theme.get("accent_btn")}; color: white; border: none;
-            border-radius: 8px; padding: 8px 20px;
-            font-size: 12px; font-weight: 600; min-width: 80px;
-        }}
-        QMessageBox QPushButton:hover {{ background-color: {Theme.get("accent_btn_h")}; }}
-    """
-
 def S_TITLEBAR():
     return f"""
         QFrame#titlebar {{
@@ -545,6 +533,136 @@ def S_BTN_THEME():
             border-color: {Theme.get("border_edit_hover")};
         }}
     """
+
+
+# =============================================================================
+#  DIÁLOGO CUSTOM (sin barra del sistema — reemplaza QMessageBox en toda la app)
+# =============================================================================
+
+class _CustomDialog(QDialog):
+    """
+    Ventana emergente personalizada sin barra de título del sistema operativo.
+    Respeta el tema activo (Theme.get) en el momento de mostrarse.
+    """
+    def __init__(self, titulo: str, mensaje: str, btn_ok: str = "Aceptar",
+                 btn_cancel: str = None, parent=None):
+        super().__init__(parent)
+        self._result = False
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setModal(True)
+        self._build(titulo, mensaje, btn_ok, btn_cancel)
+
+    def _build(self, titulo, mensaje, btn_ok, btn_cancel):
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        card = QFrame()
+        card.setObjectName("dlgCard")
+        card.setStyleSheet(f"""
+            QFrame#dlgCard {{
+                background-color: {Theme.get('bg_card')};
+                border-radius: 14px;
+                border: 1px solid {Theme.get('border_main')};
+            }}
+        """)
+
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(32)
+        shadow.setOffset(0, 8)
+        shadow.setColor(QColor(0, 0, 0, 60))
+        card.setGraphicsEffect(shadow)
+
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(28, 24, 28, 20)
+        lay.setSpacing(0)
+
+        lbl_titulo = QLabel(titulo)
+        lbl_titulo.setStyleSheet(f"""
+            color: {Theme.get('text_primary')};
+            font-size: 15px; font-weight: 700;
+            font-family: 'Segoe UI', sans-serif;
+            background: transparent;
+        """)
+        lay.addWidget(lbl_titulo)
+        lay.addSpacing(10)
+
+        lbl_msg = QLabel(mensaje)
+        lbl_msg.setWordWrap(True)
+        lbl_msg.setStyleSheet(f"""
+            color: {Theme.get('text_secondary')};
+            font-size: 13px;
+            font-family: 'Segoe UI', sans-serif;
+            background: transparent;
+        """)
+        lay.addWidget(lbl_msg)
+        lay.addSpacing(22)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+        btn_row.addStretch()
+
+        if btn_cancel:
+            b_cancel = QPushButton(btn_cancel)
+            b_cancel.setFixedHeight(38)
+            b_cancel.setMinimumWidth(100)
+            b_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+            b_cancel.setStyleSheet(f"""
+                QPushButton {{
+                    background: transparent;
+                    color: {Theme.get('text_secondary')};
+                    border: 1.5px solid {Theme.get('border_card')};
+                    border-radius: 8px; padding: 0 18px;
+                    font-size: 13px; font-weight: 600;
+                    font-family: 'Segoe UI', sans-serif;
+                }}
+                QPushButton:hover {{
+                    background-color: {Theme.get('bg_hover')};
+                    border-color: {Theme.get('border_main')};
+                    color: {Theme.get('text_primary')};
+                }}
+            """)
+            b_cancel.clicked.connect(self.reject)
+            btn_row.addWidget(b_cancel)
+
+        b_ok = QPushButton(btn_ok)
+        b_ok.setFixedHeight(38)
+        b_ok.setMinimumWidth(100)
+        b_ok.setCursor(Qt.CursorShape.PointingHandCursor)
+        b_ok.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Theme.get('accent_btn')};
+                color: #FFFFFF; border: none; border-radius: 8px;
+                padding: 0 18px; font-size: 13px; font-weight: 600;
+                font-family: 'Segoe UI', sans-serif;
+            }}
+            QPushButton:hover {{ background-color: {Theme.get('accent_btn_h')}; }}
+            QPushButton:pressed {{ background-color: {Theme.get('accent_btn_p')}; }}
+        """)
+        b_ok.clicked.connect(self._on_ok)
+        btn_row.addWidget(b_ok)
+
+        lay.addLayout(btn_row)
+        outer.addWidget(card)
+        self.setFixedWidth(400)
+
+    def _on_ok(self):
+        self._result = True
+        self.accept()
+
+    @staticmethod
+    def preguntar(titulo: str, mensaje: str, btn_si: str = "Sí",
+                  btn_no: str = "No", parent=None) -> bool:
+        dlg = _CustomDialog(titulo, mensaje, btn_ok=btn_si,
+                             btn_cancel=btn_no, parent=parent)
+        dlg.exec()
+        return dlg._result
+
+    @staticmethod
+    def informar(titulo: str, mensaje: str, parent=None):
+        dlg = _CustomDialog(titulo, mensaje, btn_ok="Aceptar",
+                             btn_cancel=None, parent=parent)
+        dlg.exec()
 
 
 # =============================================================================
@@ -1227,14 +1345,14 @@ class _PaginaCatalogo(QWidget):
         form.show()
 
     def _confirmar_eliminar(self, pelicula):
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Eliminar pelicula")
-        msg.setText(f"Eliminar \"{pelicula.titulo}\"?\nTambien se borraran sus reseñas.")
-        msg.setStandardButtons(
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        confirmado = _CustomDialog.preguntar(
+            "Eliminar película",
+            f'¿Eliminar "{pelicula.titulo}"?\nTambién se borrarán sus reseñas.',
+            btn_si="Eliminar",
+            btn_no="Cancelar",
+            parent=self
         )
-        msg.setStyleSheet(S_MSGBOX())
-        if msg.exec() == QMessageBox.StandardButton.Yes:
+        if confirmado:
             _del(pelicula)
             self.cargar()
 
@@ -1265,38 +1383,21 @@ class _PaginaCatalogo(QWidget):
 
 
 # =============================================================================
-#  PÁGINA — RESEÑAS  ← MODIFICADA: on_back + refresh_theme
+#  PÁGINA — RESEÑAS
 # =============================================================================
 
 class _PaginaResenas(QWidget):
     def __init__(self, pelicula, usuario_id: int, titulo: str, on_back, parent=None):
         super().__init__(parent)
-        self._body = None                                   # referencia a FormResenas
+        self._body = None
         self.setStyleSheet(f"background: {Theme.get('bg_app')};")
 
         ml = QVBoxLayout(self)
         ml.setContentsMargins(0, 0, 0, 0)
         ml.setSpacing(0)
 
-        # Topbar de la página (muestra el título de la película)
-        topbar = QFrame()
-        topbar.setObjectName("topbar")
-        topbar.setStyleSheet(S_TOPBAR())
-        topbar.setFixedHeight(64)
-        tb = QHBoxLayout(topbar)
-        tb.setContentsMargins(20, 0, 28, 0)
-        tb.setSpacing(10)
-
-        lbl = QLabel(titulo)
-        lbl.setStyleSheet(
-            f"color: {Theme.get('text_primary')}; font-size: 20px; font-weight: 700;"
-            "font-family: 'Segoe UI', sans-serif; background: transparent;"
-        )
-        tb.addWidget(lbl)
-        tb.addStretch()
-        ml.addWidget(topbar)
-
         # Cuerpo: FormReseñas embebido con on_back
+        # SIN topbar propio — el título lo muestra la cabecera de FormReseñas
         try:
             from FormReseñas import FormReseñas
             body = FormReseñas(
@@ -1306,18 +1407,17 @@ class _PaginaResenas(QWidget):
                 clase_resena    = None,
                 titulo_pelicula = titulo,
                 pelicula_obj    = pelicula,
-                on_back         = on_back,          # ← callback regresar al catálogo
+                on_back         = on_back,
             )
             body.setWindowFlags(Qt.WindowType.Widget)
         except ImportError:
             body = _CuerpoPlaceholder(titulo)
 
-        self._body = body                           # ← guardado para refresh_theme
+        self._body = body
         body.setStyleSheet(f"background: {Theme.get('bg_app')};")
         ml.addWidget(body, stretch=1)
 
     def refresh_theme(self):
-        """Propaga el cambio de tema a FormResenas."""
         self.setStyleSheet(f"background: {Theme.get('bg_app')};")
         if self._body is not None and hasattr(self._body, "refresh_theme"):
             self._body.refresh_theme()
@@ -1500,27 +1600,21 @@ class CatalogoWindow(QWidget):
         self._apply_theme_full()
 
     def _apply_theme_full(self):
-        # Raíz
         self.setStyleSheet(S_APP())
-        # Titlebar
         self._titlebar.refresh()
-        # Body (widget contenedor)
         if self.layout() and self.layout().count() > 1:
             body_item = self.layout().itemAt(1)
             if body_item and body_item.widget():
                 body_item.widget().setStyleSheet(f"background: {Theme.get('bg_app')};")
-        # Sidebar
         self._sidebar_frame.setStyleSheet(S_SIDEBAR())
         self._divider.setStyleSheet(
             f"background-color: {Theme.get('border_main')}; border: none; max-height: 1px;"
         )
-        # Nav buttons
         is_cat = (self._stack.currentIndex() == self._IDX_CATALOGO)
         self.btn_inicio.setStyleSheet(S_BTN_NAV(active=is_cat))
         self.btn_inicio.setIcon(_svg_icon(_ico_home(active=is_cat), 15))
         self.btn_resenas.setStyleSheet(S_BTN_NAV(active=not is_cat))
         self.btn_resenas.setIcon(_svg_icon(_ico_star(active=not is_cat), 15))
-        # Add / Logout
         if self.btn_add_sb:
             self.btn_add_sb.setStyleSheet(S_BTN_ADD())
             self.btn_add_sb.setIcon(_svg_icon(_ico_plus(dark=False), 14))
@@ -1528,15 +1622,11 @@ class CatalogoWindow(QWidget):
         self.btn_logout.setStyleSheet(S_BTN_LOGOUT())
         self.btn_logout.setIcon(_svg_icon(_ico_logout(), 15))
         self.btn_logout.setIconSize(QSize(15, 15))
-        # Stack
         self._stack.setStyleSheet(f"background: {Theme.get('bg_app')};")
-        # Catálogo
         self._pagina_catalogo.refresh_theme()
-        # ── NUEVO: propagar tema a FormResenas si está visible ──
         curr = self._stack.currentWidget()
         if isinstance(curr, _PaginaResenas):
             curr.refresh_theme()
-        # Badge
         self._badge.setStyleSheet("background: transparent;")
         for child in self._badge.findChildren(QLabel):
             if child.objectName() == "avatar":
@@ -1569,7 +1659,7 @@ class CatalogoWindow(QWidget):
             pelicula   = pelicula,
             usuario_id = self.usuario_id,
             titulo     = titulo,
-            on_back    = self._ir_a_inicio,     # ← pasa el callback al FormResenas
+            on_back    = self._ir_a_inicio,
         )
         self._stack.insertWidget(self._IDX_RESENAS, nueva)
         self._pagina_resenas_actual = nueva
@@ -1587,17 +1677,17 @@ class CatalogoWindow(QWidget):
         form = PeliculaUI(pelicula=None, callback=self.refresh, parent=self)
         form.show()
 
-    # ── Logout ────────────────────────────────────────────────────────────────
+    # ── Logout — diálogo custom sin barra del sistema ─────────────────────────
 
     def _logout(self):
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Cerrar sesión")
-        msg.setText("¿Deseas cerrar sesión y volver al inicio?")
-        msg.setStandardButtons(
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        confirmado = _CustomDialog.preguntar(
+            "Cerrar sesión",
+            "¿Deseas cerrar sesión y volver al inicio?",
+            btn_si="Sí, salir",
+            btn_no="Cancelar",
+            parent=self
         )
-        msg.setStyleSheet(S_MSGBOX())
-        if msg.exec() == QMessageBox.StandardButton.Yes:
+        if confirmado:
             try:
                 from FormLogin import FormLogin
                 self._login_win = FormLogin()
