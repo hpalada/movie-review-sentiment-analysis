@@ -55,8 +55,12 @@ resultado = comunicacion.analizar_resena(texto)
 
 ```bash
 pip install PyQt6 scikit-learn numpy scipy
+export EMAIL_SENDER=you@gmail.com
+export EMAIL_PASSWORD=your-gmail-app-password
 python principal.py
 ```
+
+Email credentials are read from environment variables (see `.env.example`). They are only needed for password-reset emails.
 
 ## ML Pipeline
 

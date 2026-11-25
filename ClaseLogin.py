@@ -1,4 +1,5 @@
 # ClaseLogin.py
+import os
 import smtplib
 import ssl
 from email.mime.text      import MIMEText
